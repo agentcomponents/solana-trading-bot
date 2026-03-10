@@ -32,34 +32,38 @@ Build a Solana crypto trading bot that:
 
 ---
 
-## Latest Session (2026-03-10) - Phase 5 Complete
+## Latest Session (2026-03-10) - System Testing Phase
 
-### ✅ Phase 5: Main Bot Orchestrator (COMPLETED THIS SESSION)
+### ✅ Live Swap Tests Completed
 
-**What Was Built:**
-- **Bot Config** (`src/bot/config.ts`) - Trading mode, parameters, defaults
-- **Bot Orchestrator** (`src/bot/orchestrator.ts`) - Main trading loop: scan → validate → entry → monitor → exit
-- **CLI Commands** (`src/cli/commands.ts`) - Commands: start:paper, start:live, report, status
-- **Main Entry** (`src/index.ts`) - Application bootstrap with error handling
+**Tests Performed:**
+1. **SOL → USDC Swap:** 0.01 SOL successfully swapped via Jupiter
+   - Quote received: 0.86 USDC
+   - Transaction confirmed on mainnet
+   - Signature verified on Solscan
 
-**Test Results:**
-```
-✅ 364 tests passing (22 test files)
-✅ 15 new bot unit tests
-✅ Clean TypeScript build
-```
+2. **USDC → SOL Swap:** Swapped back 0.86 USDC
+   - Restored SOL balance
+   - Both directions working correctly
 
-**New NPM Scripts:**
+3. **Paper Trading Full Cycle Test:** Complete end-to-end test
+   - Scanned 6 trading opportunities from DexScreener
+   - Safety checks passed (RugCheck + GoPlus)
+   - Paper entry: 25,766 tokens @ 0.000002 SOL/token
+   - Paper exit: 0.04879 SOL returned
+   - P&L: -2.42% (realistic with slippage)
+   - Position saved to database with CLOSED state
+
+**Fixes Applied:**
+- Fixed Helius RPC preflight error (`skipPreflight: true`)
+- Fixed FOREIGN KEY constraint (token metadata pre-creation)
+- Fixed exitReason CHECK constraint (use 'MANUAL' not custom strings)
+
+### 🧪 Manual Test Files
 ```bash
-npm run start:paper  # Run paper trading mode
-npm run start:live   # Run live trading mode
-npm run report       # Generate performance report
-npm run status       # Show current positions
-```
-
-**Git Commit:**
-```
-[To be committed] feat: implement Phase 5 Main Bot Orchestrator
+npx tsx tests/manual/test-live-swap.ts     # SOL → USDC swap
+npx tsx tests/manual/test-swap-back.ts     # USDC → SOL swap
+npx tsx tests/manual/test-paper-trading.ts # Full paper trading cycle
 ```
 
 ---

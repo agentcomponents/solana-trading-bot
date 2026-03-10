@@ -17,6 +17,7 @@ import { getSlippageSimulator } from './slippage';
 import { createVirtualWallet, type VirtualWalletManager } from './wallet';
 import {
   createPositionRepository,
+  createTokenMetadataRepository,
   type Position,
   type CreatePositionInput
 } from '../db';
@@ -69,12 +70,14 @@ export class PaperTradingEngine {
   private wallet: VirtualWalletManager;
   private slippageSim = getSlippageSimulator();
   private positionsRepo: ReturnType<typeof createPositionRepository>;
+  private tokenMetadataRepo: ReturnType<typeof createTokenMetadataRepository>;
   private config: PaperTradeConfig;
 
   constructor(config: PaperTradeConfig) {
     this.config = config;
     this.wallet = createVirtualWallet(config.initialSol);
     this.positionsRepo = createPositionRepository(config.db);
+    this.tokenMetadataRepo = createTokenMetadataRepository(config.db);
   }
 
   /**
@@ -142,7 +145,14 @@ export class PaperTradingEngine {
         entryPriceSol
       );
 
-      // 6. Store position (same structure as live trading!)
+      // 6. Ensure token metadata exists (for foreign key constraint)
+      this.tokenMetadataRepo.getOrCreate(token.address, {
+        symbol: tokenMetadata.symbol,
+        name: token.name || tokenMetadata.symbol,
+        decimals: tokenMetadata.decimals,
+      });
+
+      // 7. Store position (same structure as live trading!)
       const positionInput: CreatePositionInput = {
         tokenMint: token.address,
         entrySolSpent: String(Math.floor(this.config.entryAmountSol * LAMPORTS_PER_SOL)),

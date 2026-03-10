@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { _resetConfig as resetEnvConfig } from '@/config/index';
+import { _resetConfig as resetEnvConfig, validateConfig } from '@/config/index';
 import { _resetBotConfig, loadBotConfig } from '@/bot/config';
 import {
   TradingBot,
@@ -23,8 +23,10 @@ describe('bot/orchestrator', () => {
     process.env.HELIUS_WS_URL = 'wss://rpc.helius.xyz';
     process.env.BACKUP_RPC_URL = 'https://backup.rpc.com';
     process.env.DATABASE_PATH = ':memory:';
+    process.env.TRADING_MODE = 'paper';
 
-    // Load bot config
+    // Initialize config properly
+    validateConfig();
     loadBotConfig();
   });
 
