@@ -13,11 +13,32 @@ import { retry } from '../utils/retry';
 // ============================================================================
 
 const BASE_URL = 'https://api.dexscreener.com/latest';
+const BOOSTS_BASE_URL = 'https://api.dexscreener.com';
 const USER_AGENT = 'SolanaTradingBot/1.0';
 
 // ============================================================================
 // TYPES
 // ============================================================================
+
+/**
+ * Token boost response from DexScreener
+ * Tokens that are being promoted/boosted
+ */
+export interface DexScreenerTokenBoost {
+  url: string;
+  chainId: string;
+  tokenAddress: string;
+  amount?: number;
+  totalAmount?: number;
+  icon?: string;
+  header?: string;
+  description?: string | null;
+  links?: Array<{
+    type?: string;
+    label?: string;
+    url: string;
+  }>;
+}
 
 export interface DexScreenerTokenInfo {
   chainId: string;
@@ -268,37 +289,192 @@ export async function searchBySymbol(
 }
 
 /**
+ * Get latest boosted tokens from DexScreener
+ * Returns tokens that are being actively promoted
+ */
+export async function getBoostedTokens(
+  limit: number = 50
+): Promise<DexScreenerTokenBoost[]> {
+  logger.debug({ limit }, 'Fetching boosted tokens from DexScreener');
+
+  try {
+    const response = await retry(
+      async () => {
+        const res = await fetch(`${BOOSTS_BASE_URL}/token-boosts/latest/v1`, {
+          headers: {
+            'User-Agent': USER_AGENT,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error(`DexScreener boosts API returned ${res.status}`);
+        }
+
+        return res;
+      },
+      { maxAttempts: 3, initialDelayMs: 1000 }
+    );
+
+    const data = (await response.json()) as DexScreenerTokenBoost[];
+
+    if (!Array.isArray(data)) {
+      logger.debug({ dataType: typeof data }, 'Boosts API returned non-array');
+      return [];
+    }
+
+    // Filter for Solana tokens only
+    const solanaBoosts = data.filter(
+      (boost) => boost.chainId === 'solana'
+    );
+
+    logger.debug(
+      { total: data.length, solana: solanaBoosts.length },
+      'Filtered boosts by chain'
+    );
+
+    return solanaBoosts.slice(0, limit);
+  } catch (error) {
+    logger.error({ error }, 'Failed to fetch boosted tokens');
+    return [];
+  }
+}
+
+/**
+ * Get top boosted tokens (most active boosts)
+ */
+export async function getTopBoostedTokens(
+  limit: number = 50
+): Promise<DexScreenerTokenBoost[]> {
+  logger.debug({ limit }, 'Fetching top boosted tokens from DexScreener');
+
+  try {
+    const response = await retry(
+      async () => {
+        const res = await fetch(`${BOOSTS_BASE_URL}/token-boosts/top/v1`, {
+          headers: {
+            'User-Agent': USER_AGENT,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error(`DexScreener boosts API returned ${res.status}`);
+        }
+
+        return res;
+      },
+      { maxAttempts: 3, initialDelayMs: 1000 }
+    );
+
+    const data = (await response.json()) as DexScreenerTokenBoost[];
+
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    // Filter for Solana tokens only
+    const solanaBoosts = data.filter(
+      (boost) => boost.chainId === 'solana'
+    );
+
+    return solanaBoosts.slice(0, limit);
+  } catch (error) {
+    logger.error({ error }, 'Failed to fetch top boosted tokens');
+    return [];
+  }
+}
+
+/**
  * Get trending pairs on Solana
+ *
+ * Uses a two-step approach:
+ * 1. Get boosted tokens (latest promotions)
+ * 2. Fetch full pair data for each token
  */
 export async function getTrendingPairs(
   limit: number = 50
 ): Promise<TokenSearchResult[]> {
-  logger.debug({ limit }, 'Fetching trending Solana pairs');
+  logger.debug({ limit }, 'Fetching trending Solana pairs via token-boosts');
 
   try {
-    const response = await fetch(
-      `${BASE_URL}/dex/trending/solana`,
-      {
-        headers: {
-          'User-Agent': USER_AGENT,
-          'Accept': 'application/json',
-        },
-      }
-    );
+    // Step 1: Get boosted tokens
+    const boostedTokens = await getBoostedTokens(limit * 2); // Get extra for filtering
 
-    if (!response.ok) {
-      throw new Error(`DexScreener API returned ${response.status}`);
-    }
-
-    const data = (await response.json()) as DexScreenerResponse;
-
-    if (!data.pairs) {
+    if (boostedTokens.length === 0) {
+      logger.debug('No boosted tokens found');
       return [];
     }
 
-    return data.pairs
-      .slice(0, limit)
-      .map(pairToSearchResult);
+    logger.debug({ boostedCount: boostedTokens.length }, 'Fetched boosted tokens');
+
+    // Step 2: Fetch full pair data for each token (in batches)
+    const pairs: DexScreenerPair[] = [];
+    const batchSize = 5;
+
+    for (let i = 0; i < boostedTokens.length && pairs.length < limit; i += batchSize) {
+      const batch = boostedTokens.slice(i, i + batchSize);
+
+      const batchPairs = await Promise.all(
+        batch.map(async (boost) => {
+          try {
+            const response = await retry(
+              async () => {
+                const res = await fetch(
+                  `${BOOSTS_BASE_URL}/token-pairs/v1/solana/${boost.tokenAddress}`,
+                  {
+                    headers: {
+                      'User-Agent': USER_AGENT,
+                      'Accept': 'application/json',
+                    },
+                  }
+                );
+
+                if (!res.ok) {
+                  throw new Error(`Token pairs API returned ${res.status}`);
+                }
+
+                return res;
+              },
+              { maxAttempts: 2, initialDelayMs: 500 }
+            );
+
+            const data = (await response.json()) as DexScreenerPair[];
+
+            if (Array.isArray(data) && data.length > 0) {
+              // Return the best pair (highest liquidity)
+              return data.sort(
+                (a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
+              )[0];
+            }
+
+            return null;
+          } catch (error) {
+            logger.debug(
+              { tokenAddress: boost.tokenAddress, error },
+              'Failed to fetch token pairs'
+            );
+            return null;
+          }
+        })
+      );
+
+      // Add non-null pairs
+      for (const pair of batchPairs) {
+        if (pair && pairs.length < limit) {
+          pairs.push(pair);
+        }
+      }
+
+      // Small delay between batches to respect rate limits
+      if (i + batchSize < boostedTokens.length) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    logger.debug({ pairsFound: pairs.length }, 'Retrieved pair data for boosted tokens');
+
+    return pairs.map(pairToSearchResult);
   } catch (error) {
     logger.error({ error }, 'Failed to fetch trending pairs');
     return [];

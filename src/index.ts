@@ -10,6 +10,10 @@
  *   npm run status       - Show current status
  */
 
+// Load environment variables from .env file
+import { config } from 'dotenv';
+config();
+
 import { validateConfig } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { handleCommand, type CliOptions } from './cli/index.js';
