@@ -30,8 +30,12 @@ app.get('/api/stats', (req, res) => {
       ORDER BY entryTimestamp DESC
     `).all();
 
-    const activePositions = positions.filter(p => p.state !== 'CLOSED');
+    // Count only actively trading positions (not ENTERING or FAILED)
+    const activelyTrading = positions.filter(p =>
+      ['ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING'].includes(p.state)
+    );
     const closedPositions = positions.filter(p => p.state === 'CLOSED');
+    const enteringPositions = positions.filter(p => p.state === 'ENTERING');
 
     let totalPnl = 0;
     let winningTrades = 0;
@@ -52,7 +56,7 @@ app.get('/api/stats', (req, res) => {
     res.json({
       walletBalance: 0.1 + totalPnl,
       totalTrades: closedPositions.length,
-      activePositions: activePositions.length,
+      activePositions: activelyTrading.length,
       closedPositions: closedPositions.length,
       winRate,
       totalPnl,
@@ -124,9 +128,9 @@ app.get('/api/tokens', (req, res) => {
   try {
     const db = getDb();
 
-    // For now, return tokens from positions
+    // For now, return tokens from positions (deduplicated by tokenMint)
     const tokens = db.prepare(`
-      SELECT DISTINCT
+      SELECT
         p.tokenMint as address,
         tm.symbol,
         tm.name,
@@ -137,7 +141,11 @@ app.get('/api/tokens', (req, res) => {
         50 as opportunityScore
       FROM positions p
       LEFT JOIN token_metadata tm ON p.tokenMint = tm.id
-      WHERE p.state != 'CLOSED'
+      WHERE p.id IN (
+        SELECT MAX(id) FROM positions
+        WHERE state != 'CLOSED'
+        GROUP BY tokenMint
+      )
       ORDER BY p.entryTimestamp DESC
       LIMIT 10
     `).all();

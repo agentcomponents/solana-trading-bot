@@ -29,61 +29,61 @@
 <body class="min-h-screen">
   <!-- Header -->
   <header class="border-b border-[#27272a] bg-[#0a0a0f]/95 backdrop-blur sticky top-0 z-50">
-    <div class="max-w-[1800px] mx-auto px-6 py-4">
-      <div class="flex items-center justify-between">
+    <div class="max-w-[1800px] mx-auto px-4 sm:px-6 py-3 sm:py-4">
+      <div class="flex items-center justify-between gap-2">
         <!-- Logo -->
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-            <span class="text-xl font-bold">S</span>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+            <span class="text-lg sm:text-xl font-bold">S</span>
           </div>
-          <span class="text-xl font-semibold">Solana Bot</span>
+          <span class="text-base sm:text-xl font-semibold hidden sm:inline">Solana Bot</span>
         </div>
 
         <!-- Navigation -->
-        <nav class="flex items-center gap-8">
-          <a href="#" class="text-white font-medium">Dashboard</a>
-          <a href="#" class="text-zinc-400 hover:text-white transition">Trade</a>
-          <a href="#" class="text-zinc-400 hover:text-white transition">Analytics</a>
-          <a href="#" class="text-zinc-400 hover:text-white transition">Settings</a>
+        <nav class="hidden md:flex items-center gap-6">
+          <a href="#" class="text-white font-medium text-sm">Dashboard</a>
+          <a href="#" class="text-zinc-400 hover:text-white transition text-sm">Trade</a>
+          <a href="#" class="text-zinc-400 hover:text-white transition text-sm">Analytics</a>
+          <a href="#" class="text-zinc-400 hover:text-white transition text-sm">Settings</a>
         </nav>
 
         <!-- Wallet -->
-        <div class="flex items-center gap-4">
-          <div class="text-right">
-            <div class="text-sm text-zinc-400">Wallet</div>
+        <div class="flex items-center gap-2 sm:gap-4">
+          <div class="text-right hidden sm:block">
+            <div class="text-xs text-zinc-400">Wallet</div>
             <div class="font-mono text-sm" id="wallet-balance">--</div>
           </div>
-          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
+          <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
         </div>
       </div>
     </div>
   </header>
 
   <!-- Main Content -->
-  <main class="max-w-[1800px] mx-auto px-6 py-8">
+  <main class="max-w-[1800px] mx-auto px-4 sm:px-6 py-4 sm:py-8">
     <!-- Stats Cards -->
-    <div class="grid grid-cols-4 gap-6 mb-8" id="stats-container">
-      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-6">
-        <div class="text-sm text-zinc-400 mb-2">Wallet Balance</div>
-        <div class="text-2xl font-semibold mb-1" id="stat-balance">--</div>
-        <div class="text-sm" id="stat-change">--</div>
+    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8" id="stats-container">
+      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-4 sm:p-6">
+        <div class="text-xs sm:text-sm text-zinc-400 mb-1 sm:mb-2">Wallet Balance</div>
+        <div class="text-xl sm:text-2xl font-semibold mb-1" id="stat-balance">--</div>
+        <div class="text-xs sm:text-sm" id="stat-change">--</div>
       </div>
-      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-6">
-        <div class="text-sm text-zinc-400 mb-2">Total Trades</div>
-        <div class="text-2xl font-semibold" id="stat-trades">--</div>
+      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-4 sm:p-6">
+        <div class="text-xs sm:text-sm text-zinc-400 mb-1 sm:mb-2">Total Trades</div>
+        <div class="text-xl sm:text-2xl font-semibold" id="stat-trades">--</div>
       </div>
-      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-6">
-        <div class="text-sm text-zinc-400 mb-2">Win Rate</div>
-        <div class="text-2xl font-semibold" id="stat-winrate">--</div>
+      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-4 sm:p-6">
+        <div class="text-xs sm:text-sm text-zinc-400 mb-1 sm:mb-2">Win Rate</div>
+        <div class="text-xl sm:text-2xl font-semibold" id="stat-winrate">--</div>
       </div>
-      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-6">
-        <div class="text-sm text-zinc-400 mb-2">Total P&L</div>
-        <div class="text-2xl font-semibold" id="stat-pnl">--</div>
+      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-4 sm:p-6">
+        <div class="text-xs sm:text-sm text-zinc-400 mb-1 sm:mb-2">Total P&L</div>
+        <div class="text-xl sm:text-2xl font-semibold" id="stat-pnl">--</div>
       </div>
     </div>
 
     <!-- Two Column Layout -->
-    <div class="grid grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
       <!-- Left: Filtered Tokens -->
       <div class="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-hidden">
         <div class="p-6 border-b border-[#27272a]">
@@ -169,40 +169,58 @@
     async function loadPositions() {
       try {
         const positions = await fetchJSON(`${API_BASE}/positions`);
-        const activePositions = positions.filter(p => p.state !== 'CLOSED');
+        const activelyTrading = positions.filter(p =>
+          ['ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING'].includes(p.state)
+        );
         const closedPositions = positions.filter(p => p.state === 'CLOSED');
 
         // Update counts
-        document.getElementById('active-count').textContent = `${activePositions.length} positions open`;
+        document.getElementById('active-count').textContent = `${activelyTrading.length} positions open`;
         document.getElementById('closed-count').textContent = `${closedPositions.length} trades completed`;
 
         // Render active positions
         const activeContainer = document.getElementById('active-positions-container');
-        if (activePositions.length === 0) {
+        if (activelyTrading.length === 0) {
           activeContainer.innerHTML = '<div class="p-8 text-center text-zinc-500">No active positions</div>';
         } else {
-          activeContainer.innerHTML = activePositions.map(pos => `
-            <div class="p-4 hover:bg-[#27272a] transition">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center font-bold text-sm">
+          activeContainer.innerHTML = activelyTrading.map(pos => `
+            <div class="p-3 sm:p-4 hover:bg-[#27272a] transition">
+              <!-- Header Row -->
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0">
                     ${pos.symbol[0]}
                   </div>
                   <div>
-                    <div class="font-semibold">${pos.symbol}</div>
-                    <div class="text-sm text-zinc-400">${formatTime(pos.entryTimestamp)}</div>
+                    <div class="font-semibold text-sm sm:text-base">${pos.symbol}</div>
+                    <div class="text-xs text-zinc-400">${formatTime(pos.entryTimestamp)}</div>
                   </div>
                 </div>
-                <div class="text-right">
-                  <div class="font-mono text-sm">${formatNumber(pos.entrySol, 6)} SOL</div>
-                  <div class="text-sm font-medium ${pos.currentPnlPercent >= 0 ? 'text-green-500' : 'text-red-500'}">
-                    ${pos.currentPnlPercent >= 0 ? '+' : ''}${formatNumber(pos.currentPnlPercent, 2)}%
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <span class="text-xs text-zinc-500 bg-zinc-800/50 px-2 py-1 rounded hidden sm:inline-block">${pos.state}</span>
+                  <a href="${pos.dexscreenerUrl}" target="_blank" rel="noopener" class="text-zinc-400 hover:text-white transition text-sm">↗</a>
+                </div>
+              </div>
+              <!-- Stats Grid -->
+              <div class="grid grid-cols-4 gap-2 text-center">
+                <div>
+                  <div class="text-[10px] text-zinc-400 uppercase tracking-wide">Entry</div>
+                  <div class="font-mono text-xs sm:text-sm truncate">$${formatNumber(pos.entryPricePerToken, 8)}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-zinc-400 uppercase tracking-wide">Tokens</div>
+                  <div class="font-mono text-xs sm:text-sm">${formatNumber(pos.tokensHeld, 2)}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-zinc-400 uppercase tracking-wide">Spent</div>
+                  <div class="font-mono text-xs sm:text-sm">${formatNumber(pos.entrySol, 6)}S</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-zinc-400 uppercase tracking-wide">P&L</div>
+                  <div class="font-medium text-xs sm:text-sm ${pos.currentPnlPercent >= 0 ? 'text-green-500' : 'text-red-500'}">
+                    ${pos.currentPnlPercent >= 0 ? '+' : ''}${formatNumber(pos.currentPnlPercent, 1)}%
                   </div>
                 </div>
-                <div class="text-sm text-zinc-400">${pos.state}</div>
-                <a href="${pos.dexscreenerUrl}" target="_blank" rel="noopener" class="text-zinc-400 hover:text-white transition">
-                  ↗
-                </a>
               </div>
             </div>
           `).join('');
@@ -214,27 +232,43 @@
           closedContainer.innerHTML = '<div class="p-8 text-center text-zinc-500">No closed positions</div>';
         } else {
           closedContainer.innerHTML = closedPositions.slice(0, 10).map(pos => `
-            <div class="p-4 hover:bg-[#27272a] transition">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center font-bold text-sm">
+            <div class="p-3 sm:p-4 hover:bg-[#27272a] transition">
+              <!-- Header Row -->
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-zinc-600 to-zinc-700 flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0">
                     ${pos.symbol[0]}
                   </div>
                   <div>
-                    <div class="font-semibold">${pos.symbol}</div>
-                    <div class="text-sm text-zinc-400">${pos.heldMinutes}m</div>
+                    <div class="font-semibold text-sm sm:text-base">${pos.symbol}</div>
+                    <div class="text-xs text-zinc-400">${pos.heldMinutes}m held</div>
                   </div>
                 </div>
-                <div class="text-right">
-                  <div class="font-mono text-sm">${formatNumber(pos.entrySol, 6)} SOL</div>
-                  <div class="text-sm font-medium ${(pos.pnlPercent ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}">
-                    ${pos.pnlPercent !== null ? (pos.pnlPercent >= 0 ? '+' : '') + formatNumber(pos.pnlPercent, 2) + '%' : '-'}
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <span class="text-xs text-zinc-500 bg-zinc-800/50 px-2 py-1 rounded hidden sm:inline-block">${pos.exitReason || 'MANUAL'}</span>
+                  <a href="${pos.dexscreenerUrl}" target="_blank" rel="noopener" class="text-zinc-400 hover:text-white transition text-sm">↗</a>
+                </div>
+              </div>
+              <!-- Stats Grid -->
+              <div class="grid grid-cols-4 gap-2 text-center">
+                <div>
+                  <div class="text-[10px] text-zinc-400 uppercase tracking-wide">Entry</div>
+                  <div class="font-mono text-xs sm:text-sm truncate">$${formatNumber(pos.entryPricePerToken, 8)}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-zinc-400 uppercase tracking-wide">Tokens</div>
+                  <div class="font-mono text-xs sm:text-sm">${formatNumber(pos.tokensHeld, 2)}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-zinc-400 uppercase tracking-wide">Spent</div>
+                  <div class="font-mono text-xs sm:text-sm">${formatNumber(pos.entrySol, 6)}S</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-zinc-400 uppercase tracking-wide">P&L</div>
+                  <div class="font-medium text-xs sm:text-sm ${(pos.pnlPercent ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}">
+                    ${pos.pnlPercent !== null ? (pos.pnlPercent >= 0 ? '+' : '') + formatNumber(pos.pnlPercent, 1) + '%' : '-'}
                   </div>
                 </div>
-                <div class="text-sm text-zinc-400">${pos.exitReason || 'MANUAL'}</div>
-                <a href="${pos.dexscreenerUrl}" target="_blank" rel="noopener" class="text-zinc-400 hover:text-white transition">
-                  ↗
-                </a>
               </div>
             </div>
           `).join('');
@@ -257,31 +291,33 @@
         }
 
         container.innerHTML = tokens.map(token => `
-          <div class="p-4 hover:bg-[#27272a] transition cursor-pointer">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold">
+          <div class="p-3 sm:p-4 hover:bg-[#27272a] transition cursor-pointer">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-sm sm:text-base flex-shrink-0">
                   ${token.symbol[0]}
                 </div>
                 <div>
-                  <div class="font-semibold">${token.symbol}</div>
-                  <div class="text-sm text-zinc-400">${token.name}</div>
+                  <div class="font-semibold text-sm sm:text-base">${token.symbol}</div>
+                  <div class="text-xs text-zinc-400 truncate max-w-[120px] sm:max-w-none">${token.name}</div>
                 </div>
               </div>
-              <div class="text-right">
-                <div class="font-mono">$${formatNumber(token.priceUsd, 6)}</div>
-                <div class="text-sm ${token.priceChangeH1 >= 0 ? 'text-green-500' : 'text-red-500'}">
-                  ${token.priceChangeH1 >= 0 ? '+' : ''}${formatNumber(token.priceChangeH1, 1)}% (1h)
+              <div class="flex items-center gap-2">
+                <div class="text-right">
+                  <div class="font-mono text-sm sm:text-base">$${formatNumber(token.priceUsd, 6)}</div>
+                  <div class="text-xs ${token.priceChangeH1 >= 0 ? 'text-green-500' : 'text-red-500'}">
+                    ${token.priceChangeH1 >= 0 ? '+' : ''}${formatNumber(token.priceChangeH1, 1)}%
+                  </div>
                 </div>
+                <a href="${token.dexscreenerUrl}" target="_blank" rel="noopener noreferrer"
+                   class="px-3 py-2 sm:px-4 bg-green-600 hover:bg-green-700 rounded-lg text-xs sm:text-sm font-medium transition flex-shrink-0">
+                  Trade
+                </a>
               </div>
-              <div class="text-center">
-                <div class="text-sm text-zinc-400">Score</div>
-                <div class="font-semibold">${token.opportunityScore}/100</div>
-              </div>
-              <a href="${token.dexscreenerUrl}" target="_blank" rel="noopener noreferrer"
-                 class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition">
-                Trade
-              </a>
+            </div>
+            <div class="flex items-center justify-between text-xs text-zinc-400 border-t border-[#27272a] pt-2 mt-2">
+              <span>Score: <span class="text-white font-medium">${token.opportunityScore}/100</span></span>
+              <span>Liquidity: <span class="text-white font-medium">$${formatNumber(token.liquidity, 2)}</span></span>
             </div>
           </div>
         `).join('');

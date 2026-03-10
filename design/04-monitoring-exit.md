@@ -1,7 +1,7 @@
 # 04. Monitoring & Exit Strategy
 
 **Status:** Complete
-**Last Updated:** 2026-03-10
+**Last Updated:** 2026-03-10 (Updated: Aggressive Profit-Taking)
 
 ---
 
@@ -11,43 +11,63 @@ This document covers the most critical aspect of the trading bot: **when and how
 
 **User's Core Philosophy:** "I don't want to hold bags. I only want to hold SOL!"
 
+**Strategy:** Aggressive profit-taking with fast SOL recycling
+
 ---
 
 ## Exit Conditions (Summary)
 
-| Condition | Trigger | Action |
-|-----------|---------|--------|
-| **Stop Loss** | -40% from entry | Immediate exit (50% of position) |
-| **Take Profit 1** | +50% from entry | Sell 25% of position |
-| **Take Profit 2** | +100% from entry | Sell 25% of position, activate trailing stop |
-| **Trailing Stop** | 15% below peak | Sell remaining 50% |
-| **Max Hold Time** | 4 hours from entry | Exit remaining position |
-| **Emergency** | Liquidity crash, rug detected | Immediate exit, pause bot |
+| Condition | Trigger | Sell | Remaining |
+|-----------|---------|------|-----------|
+| **Stop Loss** | -25% from entry | 100% | 0% |
+| **TP1: Quick Scalp** | +30% from entry | 50% | 50% |
+| **TP2: Fast Profit** | +75% from entry | 25% | 25% |
+| **TP3: Major Win** | +100% from entry | 25% | 0% → activate trailing |
+| **TP4: Jackpot** | +150% from entry | 50% of remaining | 12.5% |
+| **Trailing Stop** | 10% below peak | Remaining | 0% |
+| **Max Hold Time** | 3 hours from entry | Remaining | 0% |
+| **Emergency** | Liquidity crash, rug detected | 100% | 0% |
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         EXIT STRATEGY VISUALIZED                       │
+│                    AGGRESSIVE EXIT STRATEGY                            │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │  Price %                                                                │
 │    ▲                                                                    │
-│ +100│══════════════════════════╗  TAKE PROFIT 2: Sell 25%, Trail 15%    │
-│     │                          ║                                        │
-│  +50│════════════════╗          ║  TAKE PROFIT 1: Sell 25%              │
-│     │               ║          ║                                        │
-│    0│───────────────╨──────────╨─────────────────────────────────────   │
-│     │               ║          ║  ENTRY                                 │
-│  -40│════════════════╝          ║  STOP LOSS: Sell 50%                  │
-│     │                          ║                                        │
+│ +150│══════════════════════════════════╗  SELL 50% - Lock in big wins   │
+│     │                                  ║                                │
+│ +100│══════════════════════╗           ║  SELL 25% - Major TP + Trail   │
+│     │                      ║           ║                                │
+│  +75│                      ║  SELL 25%  ║  Fast profit                  │
+│     │                      ║           ║                                │
+│  +30│══════════════════════╛           ║  SELL 50% - Quick scalp        │
+│     │                                          ║                        │
+│    0│──────────────────────────────────────────╨────────               │
+│     │                                          ENTRY                    │
+│  -25│══════════════════════════════════════════╝  STOP LOSS - Exit 100%  │
+│     │                                                                  │
 │    ▼                                                                    │
 │                                                                         │
-│  After +100%, trailing stop activates:                                  │
-│  • Track peak price                                                     │
-│  • Exit if price drops 15% from peak                                    │
-│  • Example: Peak +150%, drops to +127.5% → EXIT                        │
+│  After +100%, trailing stop activates at 10% below peak                 │
+│  Example: Peak +150%, drops to +135% → EXIT                             │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+## Position States (Updated)
+
+| State | Description | Remaining |
+|-------|-------------|-----------|
+| `ENTERING` | Entry transaction submitted | 100% |
+| `ACTIVE` | Position open, monitoring | 100% |
+| `PARTIAL_EXIT_1` | Quick scalp complete (+30%) | 50% |
+| `PARTIAL_EXIT_2` | Fast profit complete (+75%) | 25% |
+| `TRAILING` | Major win hit (+100%), trailing active | 0% → trailing all |
+| `JACKPOT` | Extended win (+150%), sold half of trailing | 50% of trailing |
+| `EXITING` | Exit transaction submitted | - |
+| `CLOSED` | Position fully closed | 0% |
+| `FAILED` | Stop loss hit (-25%) | 0% |
 
 ---
 
@@ -313,12 +333,13 @@ export class JupiterPriceFetcher {
 export enum PositionState {
   ENTERING = 'entering',       // Entry transaction submitted
   ACTIVE = 'active',           // Position open, monitoring
-  PARTIAL_EXIT_1 = 'partial_1', // 25% sold at +50%
-  PARTIAL_EXIT_2 = 'partial_2', // 25% sold at +100%, trailing active
-  TRAILING = 'trailing',        // Trailing stop active
+  PARTIAL_EXIT_1 = 'partial_1', // 50% sold at +30% (Quick Scalp)
+  PARTIAL_EXIT_2 = 'partial_2', // 25% sold at +75% (Fast Profit)
+  TRAILING = 'trailing',        // 25% sold at +100%, trailing stop active
+  JACKPOT = 'jackpot',          // +150% hit, sold 50% of trailing position
   EXITING = 'exiting',          // Exit transaction submitted
   CLOSED = 'closed',            // Position fully closed
-  FAILED = 'failed'             // Entry failed
+  FAILED = 'failed'             // Stop loss hit at -25%
 }
 
 export interface Position {
@@ -423,44 +444,57 @@ export class PositionManager {
   }
 
   /**
-   * Check all exit conditions
+   * Check all exit conditions (AGGRESSIVE STRATEGY)
    */
   private async checkExitConditions(position: Position): Promise<void> {
     const pnlPercent = this.calculatePnlPercent(position)
 
-    // 1. STOP LOSS: -40%
-    if (pnlPercent <= -40) {
-      await this.triggerStopLoss(position, 'Stop loss hit (-40%)')
+    // 1. STOP LOSS: -25% (exit 100% - no bag holding)
+    if (pnlPercent <= -25) {
+      await this.triggerStopLoss(position, 'Stop loss hit (-25%)')
       return
     }
 
-    // 2. MAX HOLD TIME: 4 hours
+    // 2. MAX HOLD TIME: 3 hours (faster recycling)
     const holdTime = Date.now() - position.enteredAt
-    if (holdTime > 4 * 60 * 60 * 1000) {
-      await this.triggerMaxHoldExit(position, 'Max hold time reached (4 hours)')
+    if (holdTime > 3 * 60 * 60 * 1000) {
+      await this.triggerMaxHoldExit(position, 'Max hold time reached (3 hours)')
       return
     }
 
-    // 3. TAKE PROFIT 1: +50% (only if 100% remaining)
-    if (pnlPercent >= 50 && position.remainingPercent === 100) {
-      await this.triggerPartialExit1(position, 'Take profit +50%')
+    // 3. JACKPOT: +150% (sell 50% of trailing position)
+    if (pnlPercent >= 150 && position.state === PositionState.TRAILING) {
+      await this.triggerJackpotExit(position, 'Jackpot +150%')
       return
     }
 
-    // 4. TAKE PROFIT 2: +100% (only if 75% remaining)
-    if (pnlPercent >= 100 && position.remainingPercent === 75) {
-      await this.triggerPartialExit2(position, 'Take profit +100%')
-      return
-    }
-
-    // 5. TRAILING STOP: Only active after +100% and partial exit 2
-    if (position.state === PositionState.TRAILING || position.state === PositionState.PARTIAL_EXIT_2) {
+    // 4. TRAILING STOP: Active after +100%, 10% below peak
+    if (position.state === PositionState.TRAILING || position.state === PositionState.JACKPOT) {
       const trailingPercent = this.calculateTrailingPercent(position)
-      if (trailingPercent >= 15) {
-        await this.triggerTrailingStop(position, `Trailing stop hit (15% below peak)`)
+      if (trailingPercent >= 10) {
+        await this.triggerTrailingStop(position, `Trailing stop hit (10% below peak)`)
         return
       }
     }
+
+    // 5. TAKE PROFIT 3: +100% (sell remaining 25%, activate trailing)
+    if (pnlPercent >= 100 && position.remainingPercent === 25) {
+      await this.triggerPartialExit3(position, 'Major win +100%')
+      return
+    }
+
+    // 6. TAKE PROFIT 2: +75% (sell 25%)
+    if (pnlPercent >= 75 && position.remainingPercent === 50) {
+      await this.triggerPartialExit2(position, 'Fast profit +75%')
+      return
+    }
+
+    // 7. TAKE PROFIT 1: +30% (sell 50% - quick scalp)
+    if (pnlPercent >= 30 && position.remainingPercent === 100) {
+      await this.triggerPartialExit1(position, 'Quick scalp +30%')
+      return
+    }
+  }
   }
 
   /**
@@ -496,43 +530,73 @@ export class PositionManager {
 
 ---
 
-## 4. Exit Handlers
+## 4. Exit Handlers (AGGRESSIVE STRATEGY)
 
-### Stop Loss Exit
+### Stop Loss Exit (-25%)
 
 ```typescript
 /**
- * Stop loss: Sell 50% of position immediately
+ * Stop loss: Sell 100% of position immediately - NO BAGS
  */
 private async triggerStopLoss(position: Position, reason: string): Promise<void> {
   console.error(`🛑 STOP LOSS TRIGGERED: ${reason}`)
   console.error(`   Current: ${this.formatPrice(position.currentPrice)}`)
   console.error(`   Entry: ${this.formatPrice(position.entryPrice)}`)
   console.error(`   Loss: ${this.calculatePnlPercent(position).toFixed(2)}%`)
+  console.error(`   Exiting: 100% of position - cutting losses clean`)
 
-  // Sell 50% of position
-  await this.executePartialExit(position, 50, reason)
+  // Sell ALL remaining tokens
+  const totalRaw = BigInt(position.tokensReceivedRaw)
+  await this.executeExit(position, totalRaw.toString(), position.remainingPercent, reason)
 
-  // Update state
+  // Close position completely
   position.state = PositionState.FAILED
   position.exitReason = reason
+  position.remainingPercent = 0
   await this.db.update('positions', { id: position.id }, position)
 
-  // Note: The remaining 50% would be subject to normal exit logic
-  // or could be closed immediately based on user preference
+  // Clear current position - move on to next trade
+  this.currentPosition = null
 }
 ```
 
-### Partial Exit 1 (+50%)
+### Partial Exit 1 (+30%) - Quick Scalp
 
 ```typescript
 /**
- * Take profit 1: Sell 25% at +50%
+ * Quick scalp: Sell 50% at +30%
  */
 private async triggerPartialExit1(position: Position, reason: string): Promise<void> {
-  console.log(`💰 TAKE PROFIT 1: ${reason}`)
+  console.log(`💰 QUICK SCALP: ${reason}`)
   console.log(`   Current: ${this.formatPrice(position.currentPrice)}`)
-  console.log(`   Selling: 25% of position`)
+  console.log(`   Selling: 50% of position - banking early profit`)
+
+  // Calculate raw amount to sell (50% of total)
+  const totalRaw = BigInt(position.tokensReceivedRaw)
+  const sellRaw = (totalRaw * BigInt(50)) / BigInt(100)
+
+  // Execute exit
+  await this.executeExit(position, sellRaw.toString(), 50, reason)
+
+  // Update state - 50% remaining
+  position.state = PositionState.PARTIAL_EXIT_1
+  position.remainingPercent = 50
+  await this.db.update('positions', { id: position.id }, position)
+
+  console.log(`   Remaining: 50% - letting the rest ride`)
+}
+```
+
+### Partial Exit 2 (+75%) - Fast Profit
+
+```typescript
+/**
+ * Fast profit: Sell 25% at +75%
+ */
+private async triggerPartialExit2(position: Position, reason: string): Promise<void> {
+  console.log(`💰 FAST PROFIT: ${reason}`)
+  console.log(`   Current: ${this.formatPrice(position.currentPrice)}`)
+  console.log(`   Selling: 25% of position - locking in gains`)
 
   // Calculate raw amount to sell (25% of total)
   const totalRaw = BigInt(position.tokensReceivedRaw)
@@ -541,25 +605,27 @@ private async triggerPartialExit1(position: Position, reason: string): Promise<v
   // Execute exit
   await this.executeExit(position, sellRaw.toString(), 25, reason)
 
-  // Update state
-  position.state = PositionState.PARTIAL_EXIT_1
-  position.remainingPercent = 75
+  // Update state - 25% remaining
+  position.state = PositionState.PARTIAL_EXIT_2
+  position.remainingPercent = 25
   await this.db.update('positions', { id: position.id }, position)
+
+  console.log(`   Remaining: 25% - looking for major win`)
 }
 ```
 
-### Partial Exit 2 (+100%) - Activate Trailing
+### Partial Exit 3 (+100%) - Major Win + Activate Trailing
 
 ```typescript
 /**
- * Take profit 2: Sell 25% at +100%, activate trailing stop
+ * Major win: Sell 25% at +100%, activate trailing stop
  */
-private async triggerPartialExit2(position: Position, reason: string): Promise<void> {
-  console.log(`💰 TAKE PROFIT 2: ${reason}`)
+private async triggerPartialExit3(position: Position, reason: string): Promise<void> {
+  console.log(`🎉 MAJOR WIN: ${reason}`)
   console.log(`   Current: ${this.formatPrice(position.currentPrice)}`)
   console.log(`   Peak: ${this.formatPrice(position.peakPrice)}`)
   console.log(`   Selling: 25% of position`)
-  console.log(`   ACTIVATING TRAILING STOP (15% below peak)`)
+  console.log(`   ACTIVATING TRAILING STOP (10% below peak)`)
 
   // Calculate raw amount to sell (25% of total)
   const totalRaw = BigInt(position.tokensReceivedRaw)
@@ -570,20 +636,132 @@ private async triggerPartialExit2(position: Position, reason: string): Promise<v
 
   // Update state - activate trailing stop
   position.state = PositionState.TRAILING
-  position.remainingPercent = 50
+  position.remainingPercent = 0  // In trailing mode, tracking different amount
   await this.db.update('positions', { id: position.id }, position)
 
-  // Log trailing stop info
-  console.log(`   Trailing stop will trigger at: ${this.formatPrice(position.peakPrice * 0.85)}`)
+  // Track trailing amount separately (remaining tokens from original)
+  this.trailingPositions.set(position.id, {
+    originalAmount: totalRaw.toString(),
+    trailingAmount: (totalRaw * BigInt(25)) / BigInt(100),  // 25% of original
+    peakPrice: position.peakPrice
+  })
+
+  console.log(`   Trailing stop will trigger at: ${this.formatPrice(position.peakPrice * 0.90)}`)
 }
 ```
 
-### Trailing Stop Exit
+### Jackpot Exit (+150%) - Sell Half of Trailing
 
 ```typescript
 /**
- * Trailing stop: Sell remaining when 15% below peak
+ * Jackpot: Sell 50% of trailing position at +150%
  */
+private async triggerJackpotExit(position: Position, reason: string): Promise<void> {
+  console.log(`🚀 JACKPOT: ${reason}`)
+  console.log(`   Current: ${this.formatPrice(position.currentPrice)}`)
+  console.log(`   Peak: ${this.formatPrice(position.peakPrice)}`)
+  console.log(`   Selling: 50% of trailing position - LOCKING IN HUGE WIN`)
+
+  const trailing = this.trailingPositions.get(position.id)
+  if (!trailing) {
+    console.error(`   No trailing data found, exiting full position`)
+    await this.triggerTrailingStop(position, 'No trailing data - emergency exit')
+    return
+  }
+
+  // Sell 50% of trailing amount
+  const trailingRaw = BigInt(trailing.trailingAmount)
+  const sellRaw = (trailingRaw * BigInt(50)) / BigInt(100)
+
+  await this.executeExit(position, sellRaw.toString(), 50, reason)
+
+  // Update trailing data
+  trailing.trailingAmount = (trailingRaw - sellRaw).toString()
+  this.trailingPositions.set(position.id, trailing)
+
+  // Update state
+  position.state = PositionState.JACKPOT
+  await this.db.update('positions', { id: position.id }, position)
+
+  console.log(`   Remaining: 50% of trailing - let it run!`)
+}
+```
+
+### Trailing Stop Exit (10% below peak)
+
+```typescript
+/**
+ * Trailing stop: Sell remaining when 10% below peak
+ */
+private async triggerTrailingStop(position: Position, reason: string): Promise<void> {
+  console.log(`🎯 TRAILING STOP TRIGGERED: ${reason}`)
+  console.log(`   Peak was: ${this.formatPrice(position.peakPrice)}`)
+  console.log(`   Current: ${this.formatPrice(position.currentPrice)}`)
+  console.log(`   Below peak by: ${this.calculateTrailingPercent(position).toFixed(2)}%`)
+  console.log(`   Selling remaining trailing position`)
+
+  const trailing = this.trailingPositions.get(position.id)
+  if (!trailing) {
+    console.error(`   No trailing data, attempting to exit original amount`)
+    // Fallback to original tokensReceivedRaw
+    await this.executeExit(position, position.tokensReceivedRaw, 100, reason)
+  } else {
+    // Exit all trailing tokens
+    await this.executeExit(position, trailing.trailingAmount, 100, reason)
+    this.trailingPositions.delete(position.id)
+  }
+
+  // Close position
+  position.state = PositionState.CLOSED
+  position.exitReason = reason
+  position.remainingPercent = 0
+  await this.db.update('positions', { id: position.id }, position)
+
+  // Clear current position
+  this.currentPosition = null
+
+  console.log(`   Position closed - SOL returned!`)
+}
+```
+
+### Max Hold Time Exit (3 hours)
+
+```typescript
+/**
+ * Max hold time: Exit remaining after 3 hours - faster capital recycling
+ */
+private async triggerMaxHoldExit(position: Position, reason: string): Promise<void> {
+  console.log(`⏱️ MAX HOLD TIME: ${reason}`)
+  console.log(`   Held for: ${Math.floor((Date.now() - position.enteredAt) / 60000)} minutes`)
+
+  // Calculate remaining amount based on state
+  let sellAmount: string
+  let sellPercent: number
+
+  if (position.state === PositionState.TRAILING || position.state === PositionState.JACKPOT) {
+    const trailing = this.trailingPositions.get(position.id)
+    sellAmount = trailing?.trailingAmount || position.tokensReceivedRaw
+    sellPercent = 100
+  } else {
+    const totalRaw = BigInt(position.tokensReceivedRaw)
+    sellAmount = ((totalRaw * BigInt(position.remainingPercent)) / BigInt(100)).toString()
+    sellPercent = position.remainingPercent
+  }
+
+  console.log(`   Exiting remaining: ${sellPercent}%`)
+
+  // Execute exit
+  await this.executeExit(position, sellAmount, sellPercent, reason)
+
+  // Close position
+  position.state = PositionState.CLOSED
+  position.exitReason = reason
+  position.remainingPercent = 0
+  await this.db.update('positions', { id: position.id }, position)
+
+  // Clear current position
+  this.currentPosition = null
+}
 private async triggerTrailingStop(position: Position, reason: string): Promise<void> {
   console.log(`🎯 TRAILING STOP TRIGGERED: ${reason}`)
   console.log(`   Peak was: ${this.formatPrice(position.peakPrice)}`)
@@ -952,7 +1130,7 @@ CREATE TABLE price_history (
 CREATE TABLE exit_events (
   id TEXT PRIMARY KEY,
   position_id TEXT NOT NULL,
-  event_type TEXT NOT NULL,  -- 'stop_loss', 'take_profit_1', 'take_profit_2', 'trailing_stop', 'max_hold', 'emergency'
+  event_type TEXT NOT NULL,  -- 'stop_loss', 'tp1_quick_scalp', 'tp2_fast_profit', 'tp3_major_win', 'jackpot', 'trailing_stop', 'max_hold', 'emergency'
   trigger_value REAL NOT NULL,
   price_at_trigger REAL NOT NULL,
   pnl_percent REAL NOT NULL,
@@ -1011,29 +1189,33 @@ Real-time position status display:
 
 ---
 
-## 10. Configuration
+## 10. Configuration (AGGRESSIVE STRATEGY)
 
 ```typescript
 export interface ExitStrategyConfig {
-  // Percentages
-  stopLossPercent: number          // -40%
-  takeProfit1Percent: number       // +50%
-  takeProfit2Percent: number       // +100%
-  trailingStopPercent: number      // 15% below peak
+  // Percentages (AGGRESSIVE)
+  stopLossPercent: number          // -25%
+  takeProfit1Percent: number       // +30%
+  takeProfit2Percent: number       // +75%
+  takeProfit3Percent: number       // +100%
+  jackpotPercent: number           // +150%
+  trailingStopPercent: number      // 10% below peak
 
-  // Position sizing
-  takeProfit1SellPercent: number   // 25%
+  // Position sizing (AGGRESSIVE - sell more, faster)
+  takeProfit1SellPercent: number   // 50%
   takeProfit2SellPercent: number   // 25%
-  stopLossSellPercent: number      // 50% (remainder handled by normal logic)
+  takeProfit3SellPercent: number   // 25%
+  jackpotSellPercent: number       // 50% of trailing
+  stopLossSellPercent: number      // 100% (exit all)
 
-  // Time limits
-  maxHoldTimeMs: number            // 4 hours
+  // Time limits (FASTER recycling)
+  maxHoldTimeMs: number            // 3 hours
 
   // Price monitoring
   pricePollIntervalMs: number      // 2000ms (2 seconds)
   priceCacheTtlMs: number          // 5000ms (5 seconds)
 
-  // Slippage
+  // Slippage (may need higher for aggressive exits)
   normalExitSlippageBps: number    // 100 (1%)
   urgentExitSlippageBps: number    // 300 (3%)
   emergencyExitSlippageBps: number // 500 (5%)
@@ -1044,16 +1226,20 @@ export interface ExitStrategyConfig {
 }
 
 export const DEFAULT_EXIT_CONFIG: ExitStrategyConfig = {
-  stopLossPercent: -40,
-  takeProfit1Percent: 50,
-  takeProfit2Percent: 100,
-  trailingStopPercent: 15,
+  stopLossPercent: -25,
+  takeProfit1Percent: 30,
+  takeProfit2Percent: 75,
+  takeProfit3Percent: 100,
+  jackpotPercent: 150,
+  trailingStopPercent: 10,
 
-  takeProfit1SellPercent: 25,
+  takeProfit1SellPercent: 50,
   takeProfit2SellPercent: 25,
-  stopLossSellPercent: 50,
+  takeProfit3SellPercent: 25,
+  jackpotSellPercent: 50,
+  stopLossSellPercent: 100,
 
-  maxHoldTimeMs: 4 * 60 * 60 * 1000,
+  maxHoldTimeMs: 3 * 60 * 60 * 1000,
 
   pricePollIntervalMs: 2000,
   priceCacheTtlMs: 5000,
@@ -1069,21 +1255,38 @@ export const DEFAULT_EXIT_CONFIG: ExitStrategyConfig = {
 
 ---
 
-## Summary: Exit Strategy Checklist
+## Summary: Aggressive Exit Strategy Checklist
 
-| Condition | Trigger | Action | Priority Fee |
-|-----------|---------|--------|--------------|
-| **Stop Loss** | -40% | Sell 50% | 500K lamports |
-| **Take Profit 1** | +50% | Sell 25% | 100K lamports |
-| **Take Profit 2** | +100% | Sell 25%, enable trailing | 500K lamports |
-| **Trailing Stop** | 15% below peak | Sell remaining | 1M lamports |
-| **Max Hold** | 4 hours | Sell remaining | 100K lamports |
-| **Emergency** | Liquidity crash / rug | Sell all | 2M lamports |
+| Condition | Trigger | Sell | Remaining | Priority Fee |
+|-----------|---------|------|-----------|--------------|
+| **Stop Loss** | -25% | 100% | 0% | 500K lamports |
+| **TP1: Quick Scalp** | +30% | 50% | 50% | 100K lamports |
+| **TP2: Fast Profit** | +75% | 25% | 25% | 200K lamports |
+| **TP3: Major Win** | +100% | 25% | 0% → trail | 500K lamports |
+| **TP4: Jackpot** | +150% | 50% of trail | 50% of trail | 500K lamports |
+| **Trailing Stop** | 10% below peak | Remaining | 0% | 1M lamports |
+| **Max Hold** | 3 hours | Remaining | 0% | 100K lamports |
+| **Emergency** | Liquidity crash / rug | 100% | 0% | 2M lamports |
+
+**Example Trade Flow:**
+```
+Entry: 0.05 SOL
++30%: Sell 50% → 0.0325 SOL returned
++75%: Sell 25% → 0.0219 SOL returned
++100%: Sell 25% → 0.025 SOL returned, activate trailing
++150%: Sell 50% of trailing → bank huge win
+-10% from peak: Trailing stop → exit remaining
+
+Total SOL returned: ~0.079+ SOL (59%+ profit)
+Only ~0.0125 SOL at risk after first 3 exits
+```
 
 **Critical Implementation Points:**
 1. Poll Jupiter API every 2 seconds for accurate prices
 2. Store raw amounts at entry, use directly at exit (design/02-decimal-handling.md)
 3. Track peak price for trailing stop calculation
+4. Use separate tracking for trailing position amounts
+5. **Stop loss exits 100% - no bag holding**
 4. Use priority fees strategically (design/06-priority-fees.md)
 5. Save state before/after every trade (design/07-error-recovery.md)
 
