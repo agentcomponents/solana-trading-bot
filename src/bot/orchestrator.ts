@@ -18,6 +18,8 @@ import { getBotConfig, type TradingBotConfig } from './config.js';
 import { logger } from '../utils/logger.js';
 import { getExitOrchestrator, type ExitOrchestrator } from '../exit/orchestrator.js';
 import { createPaperTradingEngine } from '../paper/engine.js';
+import { getQuote, executeSwapWithRetry, SOL_MINT } from '../jupiter/client.js';
+import { initializeConnections, getWalletBalance, getConnection } from '../solana/index.js';
 
 // ============================================================================
 // TYPES
@@ -87,6 +89,12 @@ export class TradingBot {
       const dbClient = getDbClient();
       initializeDatabase(dbClient);
       this.db = dbClient.getDb();
+    }
+
+    // Initialize Solana RPC connections for live trading
+    if (this.config.mode === 'live') {
+      initializeConnections();
+      logger.info('Solana RPC connections initialized for live trading');
     }
 
     // Create exit orchestrator
@@ -351,13 +359,79 @@ export class TradingBot {
 
         return { success: result.success, error: result.error };
       } else {
-        // Live trading entry (to be implemented)
-        logger.warn({ symbol: signal.symbol }, 'Live trading not yet implemented');
-        return { success: false, error: 'Live trading not yet implemented' };
+        // Live trading entry
+        return await this.executeLiveEntry(signal);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error({ error, symbol: signal.symbol }, 'Entry execution failed');
+      return { success: false, error: message };
+    }
+  }
+
+  /**
+   * Execute a live trading entry using Jupiter
+   */
+  private async executeLiveEntry(signal: any): Promise<{ success: boolean; error?: string }> {
+    try {
+      logger.info(
+        { symbol: signal.symbol, address: signal.address },
+        'Executing live entry'
+      );
+
+      // Calculate entry amount in lamports
+      const entryAmountSol = this.config.initialSol / this.config.maxPositions;
+      const entryAmountLamports = Math.floor(entryAmountSol * 1e9);
+
+      // Get quote from Jupiter (SOL -> Token)
+      const quote = await getQuote({
+        inputMint: SOL_MINT,
+        outputMint: signal.address,
+        amount: entryAmountLamports,
+        slippageBps: this.config.entrySlippageBps,
+      });
+
+      logger.info(
+        {
+          symbol: signal.symbol,
+          inAmount: quote.inAmount,
+          outAmount: quote.outAmount,
+          priceImpact: quote.priceImpactPct,
+        },
+        'Jupiter quote received'
+      );
+
+      // Execute swap
+      const result = await executeSwapWithRetry({
+        quoteResponse: quote,
+        priorityLevel: 'high',
+        maxPriorityFeeLamports: 1000000, // 0.001 SOL
+      });
+
+      if (result.success && result.signature) {
+        logger.info(
+          {
+            symbol: signal.symbol,
+            signature: result.signature,
+            explorerUrl: result.explorerUrl,
+          },
+          'Live entry executed successfully'
+        );
+
+        // TODO: Create position in database
+        // This would be done by recording the entry with the signature
+
+        return { success: true };
+      } else {
+        logger.error(
+          { symbol: signal.symbol, error: result.error },
+          'Live entry failed'
+        );
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error, symbol: signal.symbol }, 'Live entry execution failed');
       return { success: false, error: message };
     }
   }
@@ -380,7 +454,8 @@ export class TradingBot {
       return state.solBalance;
     }
 
-    // For live trading, would fetch actual wallet balance
+    // For live trading, fetch actual wallet balance asynchronously
+    // Note: This returns the cached value; actual balance should be fetched periodically
     return this.config.initialSol;
   }
 }

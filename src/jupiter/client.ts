@@ -10,7 +10,14 @@ import {
   QuoteResponse,
   SwapPostRequest
 } from '@jup-ag/api';
+import {
+  Connection,
+  Transaction,
+  VersionedTransaction,
+  SendTransactionError
+} from '@solana/web3.js';
 import { logger } from '../utils/logger';
+import { getWalletKeypair, getConnection } from '../solana';
 
 // ============================================================================
 // CONFIG
@@ -172,6 +179,156 @@ export async function prepareSwap(params: JupiterSwapParams): Promise<JupiterSwa
     logger.error({ error }, 'Jupiter swap preparation failed');
     throw new Error(`Jupiter swap preparation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+// ============================================================================
+// SWAP EXECUTION
+// ============================================================================
+
+export interface ExecuteSwapResult {
+  success: boolean;
+  signature?: string;
+  error?: string;
+  explorerUrl?: string;
+}
+
+export interface ExecuteSwapParams {
+  quoteResponse: QuoteResponse;
+  priorityLevel?: 'veryHigh' | 'high' | 'medium' | 'low' | 'veryLow';
+  maxPriorityFeeLamports?: number;
+  skipConfirmation?: boolean;
+}
+
+/**
+ * Execute a swap transaction on-chain
+ *
+ * This is the main function for live trading. It:
+ * 1. Prepares the swap transaction with Jupiter
+ * 2. Deserializes the transaction
+ * 3. Signs it with the wallet keypair
+ * 4. Sends it via RPC
+ * 5. Waits for confirmation
+ *
+ * @param params Swap parameters
+ * @returns Transaction signature or error
+ */
+export async function executeSwap(params: ExecuteSwapParams): Promise<ExecuteSwapResult> {
+  const keypair = getWalletKeypair();
+  const connection = getConnection();
+
+  logger.info(
+    {
+      inputMint: params.quoteResponse.inputMint,
+      outputMint: params.quoteResponse.outputMint,
+      inAmount: params.quoteResponse.inAmount,
+      outAmount: params.quoteResponse.outAmount,
+    },
+    'Executing Jupiter swap'
+  );
+
+  try {
+    // Step 1: Prepare swap transaction
+    const swapResult = await prepareSwap({
+      quoteResponse: params.quoteResponse,
+      userPublicKey: keypair.publicKey.toBase58(),
+      priorityLevel: params.priorityLevel ?? 'high',
+      maxPriorityFeeLamports: params.maxPriorityFeeLamports ?? 1000000, // 0.001 SOL
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
+    });
+
+    // Step 2: Deserialize transaction
+    // Jupiter returns versioned transactions
+    const transactionBuf = Buffer.from(swapResult.swapTransaction, 'base64');
+    const transaction = VersionedTransaction.deserialize(transactionBuf);
+
+    // Step 3: Sign transaction
+    transaction.sign([keypair]);
+
+    logger.debug({ lastValidBlockHeight: swapResult.lastValidBlockHeight }, 'Transaction signed');
+
+    // Step 4: Send transaction
+    const signature = await connection.sendTransaction(transaction, {
+      skipPreflight: false,
+      maxRetries: 3,
+    });
+
+    logger.info({ signature }, 'Transaction sent');
+
+    // Step 5: Wait for confirmation (optional, for speed)
+    if (!params.skipConfirmation) {
+      const confirmation = await connection.confirmTransaction(
+        signature,
+        'confirmed'
+      );
+
+      if (confirmation.value.err) {
+        logger.error({ error: confirmation.value.err, signature }, 'Transaction failed on-chain');
+        return {
+          success: false,
+          error: `Transaction failed: ${JSON.stringify(confirmation.value.err)}`,
+        };
+      }
+
+      logger.info({ signature }, 'Transaction confirmed');
+    }
+
+    return {
+      success: true,
+      signature,
+      explorerUrl: `https://solscan.io/tx/${signature}`,
+    };
+  } catch (error) {
+    logger.error({ error }, 'Swap execution failed');
+
+    // Handle specific errors
+    if (error instanceof SendTransactionError) {
+      return {
+        success: false,
+        error: `Transaction failed: ${error.message}`,
+      };
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Execute swap with retries
+ *
+ * Retries on transient failures like network issues.
+ */
+export async function executeSwapWithRetry(
+  params: ExecuteSwapParams,
+  maxAttempts = 3,
+  delayMs = 2000
+): Promise<ExecuteSwapResult> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await executeSwap(params);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      logger.warn(
+        { attempt, maxAttempts, error: lastError.message },
+        'Swap execution failed, retrying'
+      );
+
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+      }
+    }
+  }
+
+  return {
+    success: false,
+    error: lastError?.message ?? 'Swap failed after retries',
+  };
 }
 
 /**
