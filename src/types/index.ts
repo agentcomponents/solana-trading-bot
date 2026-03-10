@@ -420,6 +420,25 @@ export const RugCheckLockerSchema = z.object({
 });
 
 /**
+ * RugCheck API known account validation
+ * Maps address -> {name, type}
+ */
+export const RugCheckKnownAccountSchema = z.object({
+  name: z.string(),
+  type: z.string(),
+});
+
+/**
+ * RugCheck API launchpad validation
+ */
+export const RugCheckLaunchpadSchema = z.object({
+  name: z.string(),
+  logo: z.string().optional(),
+  url: z.string().optional(),
+  platform: z.string().optional(),
+}).nullable();
+
+/**
  * RugCheck API full report validation
  */
 export const RugCheckReportSchema = z.object({
@@ -452,14 +471,14 @@ export const RugCheckReportSchema = z.object({
     maxAmount: z.number(),
     authority: z.string(),
   }),
-  knownAccounts: z.array(z.unknown()).nullable().optional(),
+  knownAccounts: z.record(z.string(), RugCheckKnownAccountSchema).nullable(),
   events: z.array(z.unknown()).nullable().optional(),
   verification: z.unknown(),
   graphInsidersDetected: z.number().int().nonnegative(),
   insiderNetworks: z.array(z.unknown()).nullable().optional(),
   detectedAt: z.string(),
   creatorTokens: z.array(z.unknown()).nullable().optional(),
-  launchpad: z.string().nullable().optional(),
+  launchpad: RugCheckLaunchpadSchema,
   deployPlatform: z.string(),
 }).passthrough(); // Allow additional fields
 
