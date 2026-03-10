@@ -27,14 +27,15 @@ Build a Solana crypto trading bot that:
 | 03-paper-trading.md | ✅ Complete | Paper trading architecture with realistic simulation |
 | 05-compounding.md | ✅ Complete | 3-stage compounding: build, growth, expansion |
 | 06-priority-fees.md | ✅ Complete | Dynamic priority fees, entry/exit strategies |
+| 07-error-recovery.md | ✅ Complete | RPC failover, transaction monitoring, circuit breakers |
 
 ### 🔄 In Progress / Next Up
 
 | Topic | Status | Priority |
 |-------|--------|----------|
-| Error Recovery | 📝 NEXT | RPC failures, stuck transactions, retry logic |
+| Exit Strategy Details | 📝 NEXT | Complete design/04-monitoring-exit.md |
 | Monitoring/Dashboard | 📝 Planned | Grafana setup, real-time metrics |
-| Exit Strategy Details | 📝 Planned | Complete design/04-monitoring-exit.md |
+| Implementation Plan | 📝 Planned | Phase-by-phase build guide |
 
 ### ✅ Recently Completed (2026-03-10)
 
@@ -101,6 +102,16 @@ await jupiter.swap({
 
 **Full Design:** `design/06-priority-fees.md`
 
+### 7. Error Recovery & Resilience
+- **Multi-RPC Strategy:** Primary (Helius) + Backup + Public fallback with automatic failover
+- **Circuit Breaker:** Open after 5 failures, half-open after 60 seconds
+- **Transaction Monitoring:** Track every tx, detect stuck after 60s
+- **Exponential Backoff:** 3 attempts, 1s → 2s → 4s delay
+- **State Persistence:** Save before/after every trade for crash recovery
+- **Emergency Controls:** Manual pause/resume, auto-pause on critical errors
+
+**Full Design:** `design/07-error-recovery.md`
+
 ---
 
 ## Technical Stack
@@ -141,6 +152,7 @@ Picker/
 │   ├── 03-paper-trading.md      # Paper trading architecture
 │   ├── 05-compounding.md        # Compounding strategy
 │   ├── 06-priority-fees.md      # Priority fee strategies
+│   ├── 07-error-recovery.md     # Error recovery & resilience
 │   ├── 04-monitoring-exit.md    # Exit strategy (pending)
 ├── docs/                        # API docs (to be added)
 ├── src/                         # Source code (when ready to build)
@@ -182,11 +194,10 @@ From direct conversation:
 
 ## Next Steps (Current Session Priorities)
 
-**Design Status: 95% Complete**
+**Design Status: 98% Complete**
 
-1. **Error Recovery Design** - RPC failures, stuck transactions, retry logic (NEXT)
-2. **Finalize Exit Strategy (04-monitoring-exit.md)** - WebSocket setup, trailing stop implementation
-3. **Implementation Plan** - Phase-by-phase build guide (after all design complete)
+1. **Finalize Exit Strategy (04-monitoring-exit.md)** - WebSocket setup, trailing stop implementation (NEXT)
+2. **Implementation Plan** - Phase-by-phase build guide (after all design complete)
 
 ---
 
@@ -196,16 +207,23 @@ From direct conversation:
 - **Priority Fees Research (design/06-priority-fees.md):**
   - Dynamic fee strategy: Conservative entry (10K-50K lamports), Aggressive exit (100K-1M+ lamports)
   - Cost-benefit analysis: Priority fees pay for themselves 20x on average
-  - Jupiter integration with `prioritizationFeeLamports` parameter
-  - Dynamic fee calculation based on profit level and urgency
-  - Network condition monitoring via Helius WebSocket
-  - Configuration examples (conservative vs aggressive)
+- **Error Recovery Design (design/07-error-recovery.md):**
+  - Multi-RPC failover with health monitoring
+  - Transaction lifecycle management (pending → submitted → confirmed)
+  - Stuck transaction detection (60s+ = stuck)
+  - Circuit breaker pattern for external services
+  - Exponential backoff retry strategy
+  - State persistence for crash recovery
+  - Emergency pause/resume controls
 
-**Key Insight:** Priority fees on exits are almost always worth it. The cost (0.0001-0.001 SOL) is minimal compared to the risk of price slippage while waiting for confirmation.
+**Key Insights:**
+- Priority fees on exits are almost always worth it
+- All state must be persisted BEFORE any trading action
+- Stuck transactions require manual verification on Solscan
 
-**Design Status:** 95% Complete
+**Design Status:** 98% Complete
 
-**Next Priority:** Error Recovery Design (RPC failures, stuck transactions, retry logic)
+**Next Priority:** Finalize Exit Strategy (WebSocket setup, trailing stop implementation)
 
 ---
 

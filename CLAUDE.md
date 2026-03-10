@@ -141,7 +141,8 @@ Picker/
 │   ├── 03-paper-trading.md    # Paper trading design
 │   ├── 04-monitoring-exit.md  # Exit strategy (pending)
 │   ├── 05-compounding.md      # Compounding logic
-│   └── 06-priority-fees.md    # Priority fee strategies
+│   ├── 06-priority-fees.md    # Priority fee strategies
+│   └── 07-error-recovery.md   # Error recovery & resilience
 ├── docs/                  # API references (empty for now)
 └── src/                   # Source code (NOT CREATED YET)
 ```
@@ -234,8 +235,8 @@ When user approves design, follow this order:
 3. ✅ Paper trading architecture
 4. ✅ Position compounding logic
 5. ✅ Priority fee strategies
-6. ⏳ **Error recovery design** (NEXT)
-7. ⏳ Monitoring/exit strategy details
+6. ✅ **Error recovery design**
+7. ⏳ **Finalize exit strategy** (NEXT - design/04-monitoring-exit.md)
 8. ⏳ Implementation plan
 
 ---
@@ -268,4 +269,4 @@ When user approves design, follow this order:
 ---
 
 *Last Updated: 2026-03-10*
-*Session Phase: Design & Architecture (95% Complete)*
+*Session Phase: Design & Architecture (98% Complete)*

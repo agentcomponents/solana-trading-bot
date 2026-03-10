@@ -21,7 +21,7 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 📝 Design | ✅ 95% Complete | Architecture, decimals, paper trading, compounding, priority fees done; error recovery, monitoring pending |
+| 📝 Design | ✅ 98% Complete | All designs complete except final exit strategy details |
 | 🔨 Implementation | ⏳ Planned | Awaiting design sign-off |
 | 📊 Paper Trading | ⏳ Planned | 20+ trades before going live |
 | 🚀 Live Trading | ⏳ Planned | After paper trading validation |
@@ -73,6 +73,23 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 - **Expansion (1.0+ SOL):** 20% of portfolio, profit taking at 50% gain
 - **File:** `design/05-compounding.md`
 
+### 6. Priority Fee Strategy
+- **Entry:** Conservative (10K-50K lamports) - opportunity cost only
+- **Exit:** Aggressive (100K-1M+ lamports) - speed is critical
+- **Dynamic:** Scale based on profit level and urgency
+- **File:** `design/06-priority-fees.md`
+
+### 7. Error Recovery
+- **Multi-RPC:** Primary (Helius) + Backup + Public fallback
+- **Circuit Breaker:** Open after 5 failures, auto-retry after 60s
+- **Transaction Monitoring:** Detect stuck tx after 60s
+- **State Persistence:** Save before/after every trade
+- **File:** `design/07-error-recovery.md`
+- **Build (0.1-0.3 SOL):** Fixed 0.1 SOL, compound +0.05 per 0.05 profit
+- **Growth (0.3-1.0 SOL):** Scale 0.15→0.25 SOL, compound +0.1 per 0.1 profit
+- **Expansion (1.0+ SOL):** 20% of portfolio, profit taking at 50% gain
+- **File:** `design/05-compounding.md`
+
 ---
 
 ## Project Structure
@@ -88,7 +105,8 @@ Picker/
 │   ├── 03-paper-trading.md      # Paper trading architecture
 │   ├── 04-monitoring-exit.md    # Exit strategy (pending)
 │   ├── 05-compounding.md        # Compounding strategy
-│   └── 06-priority-fees.md      # Priority fee strategies
+│   ├── 06-priority-fees.md      # Priority fee strategies
+│   └── 07-error-recovery.md     # Error recovery & resilience
 ├── docs/                        # API references
 ├── src/                         # Source code (when implemented)
 │   ├── config/
