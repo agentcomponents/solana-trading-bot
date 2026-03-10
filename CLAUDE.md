@@ -140,7 +140,8 @@ Picker/
 │   ├── 02-decimal-handling.md # CRITICAL: Decimal solution
 │   ├── 03-paper-trading.md    # Paper trading design
 │   ├── 04-monitoring-exit.md  # Exit strategy (pending)
-│   └── 05-compounding.md      # Compounding logic (pending)
+│   ├── 05-compounding.md      # Compounding logic
+│   └── 06-priority-fees.md    # Priority fee strategies
 ├── docs/                  # API references (empty for now)
 └── src/                   # Source code (NOT CREATED YET)
 ```
@@ -231,10 +232,11 @@ When user approves design, follow this order:
 1. ✅ Architecture design
 2. ✅ Decimal handling solution
 3. ✅ Paper trading architecture
-4. ⏳ **Position compounding logic** (NEXT)
-5. ⏳ Error recovery design
-6. ⏳ Monitoring/exit strategy details
-7. ⏳ Implementation plan
+4. ✅ Position compounding logic
+5. ✅ Priority fee strategies
+6. ⏳ **Error recovery design** (NEXT)
+7. ⏳ Monitoring/exit strategy details
+8. ⏳ Implementation plan
 
 ---
 
@@ -265,5 +267,5 @@ When user approves design, follow this order:
 
 ---
 
-*Last Updated: 2025-03-10*
-*Session Phase: Design & Architecture*
+*Last Updated: 2026-03-10*
+*Session Phase: Design & Architecture (95% Complete)*
