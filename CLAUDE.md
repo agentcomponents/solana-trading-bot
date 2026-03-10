@@ -31,21 +31,24 @@ git log --oneline -5
 
 **Starting Capital:** 0.1 SOL → Compounds after reaching 0.3 SOL
 
+**Key Strategy Change (2025-03):**
+- Real-time token discovery via WebSocket
+- Age-based classification (FRESH vs WARM tokens)
+- Conservative profit targets (5-10%) - consistent wins over home runs
+- Jupiter tradeability filter (only tradeable tokens)
+
 ---
 
-## Current Status: IMPLEMENTATION COMPLETE ✅
+## Current Status: WEBSOCKET DISCOVERY ✅
 
-| Phase | Status | Tests |
-|-------|--------|-------|
-| Phase 1: Project Foundation | ✅ Complete | 93 tests |
-| Phase 2: Database + APIs | ✅ Complete | 225+ tests |
-| Phase 3: Trading Engine | ✅ Complete | 298+ tests |
-| Phase 4: Paper Trading | ✅ Complete | 31 tests |
-| Phase 5: Main Bot | ✅ Complete | 15 tests |
-
-**Total: 364 tests passing ✅**
-
-**Current State:** Bot is fully implemented and currently running in paper trading mode.
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1: Project Foundation | ✅ Complete | Core infrastructure, types, config |
+| Phase 2: Database + APIs | ✅ Complete | SQLite, DexScreener, Jupiter, Safety |
+| Phase 3: Trading Engine | ✅ Complete | Entry/exit with paper trading |
+| Phase 4: Paper Trading | ✅ Complete | Engine + WebSocket integration |
+| Phase 5: WebSocket Discovery | ✅ Complete | Real-time token discovery |
+| Phase 6: Live Trading | ⏳ Planned | After validation |
 
 ---
 
@@ -54,17 +57,14 @@ git log --oneline -5
 ```bash
 # Build and test
 npm run build      # TypeScript compilation
-npm test -- --run  # Run all 364 tests
+npm test           # Run unit tests
 
-# Run the bot
-npm run start:paper  # Paper trading mode (simulated)
-npm run start:live   # Live trading mode (REAL MONEY)
+# WebSocket Discovery (NEW)
+npx tsx tests/manual/test-websocket-discovery.ts       # Test WebSocket discovery
+npx tsx tests/manual/test-websocket-orchestrator.ts     # Test entry orchestrator
+npx tsx tests/manual/test-websocket-paper-trading.ts    # Test paper trading with WS
 
-# Monitor and report
-npm run status       # Show current positions
-npm run report       # Generate performance report
-
-# Manual tests
+# Existing tests
 npx tsx tests/manual/test-paper-trading.ts  # Full paper trading cycle test
 npx tsx tests/manual/test-live-swap.ts      # Test live SOL→USDC swap
 npx tsx tests/manual/test-swap-back.ts      # Test USDC→SOL swap
@@ -84,8 +84,8 @@ TRADING_MODE=live
 WALLET_PRIVATE_KEY=your_key_here
 
 # RPC endpoints
-HELIUS_RPC_URL=https://beta.helius-rpc.com/?api-key=YOUR_KEY
-HELIUS_WS_URL=wss://beta.helius-rpc.com/?api-key=YOUR_KEY
+HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+HELIUS_WS_URL=wss://mainnet.helius-rpc.com/?api-key=YOUR_KEY
 BACKUP_RPC_URL=https://api.mainnet-beta.solana.com
 
 # APIs
@@ -93,26 +93,26 @@ JUPITER_API_KEY=your_key
 GOPLUS_API_KEY=your_key
 ```
 
-### Trading Parameters
+### Trading Parameters (Updated 2025-03)
 
-| Parameter | Value |
-|-----------|-------|
-| Initial Capital | 0.1 SOL |
-| Entry Slippage | 1% (100 bps) |
-| Exit Slippage | 3% (300 bps) |
-| Max Positions | 1 |
-| Scan Interval | 60 seconds |
-| Stop Loss | -40% |
-| Take Profit 1 | +50% (sell 25%) |
-| Take Profit 2 | +100% (sell 25%, activate trailing) |
-| Trailing Stop | 15% below peak |
-| Max Hold Time | 4 hours |
+| Parameter | FRESH Tokens | WARM Tokens |
+|-----------|--------------|-------------|
+| **Age** | < 1 hour old | 1-4 hours old |
+| **Target Profit** | 10% | 5% |
+| **Stop Loss** | -20% | -25% |
+| **Max Hold Time** | 1 hour | 4 hours |
+| **Position Size** | 0.05 SOL | 0.10 SOL |
+| **Min Liquidity** | $10,000 | $25,000 |
+| **Min Volume 24h** | $1,000 | $5,000 |
+| **Min Pump Required** | None | 3%+ |
+
+**Strategy Philosophy:** Consistent 5-10% wins add up. Don't expect every token to do 25-150%.
 
 ---
 
-## Critical Design Decisions (Must Follow)
+## Critical Design Decisions
 
-### 1. Decimal Precision (CRITICAL - User's Past Bug)
+### 1. Decimal Precision (CRITICAL)
 
 **The Problem:** User experienced skewed sell balances because tokens have 6-9 decimals.
 
@@ -120,7 +120,6 @@ GOPLUS_API_KEY=your_key
 - Fetch token metadata (decimals) at ENTRY time
 - Store `tokensReceivedRaw` (exact value from Jupiter) in database
 - At EXIT, use stored raw amount directly - NO conversion
-- Only convert to human amounts for display and P&L calculation
 
 ```typescript
 // CORRECT PATTERN (must follow)
@@ -135,36 +134,56 @@ await jupiter.swap({
 })
 ```
 
-### 2. Foreign Key Constraints
+### 2. WebSocket Token Discovery (NEW 2025-03)
 
-**Important:** When creating a position, the `token_metadata` entry must exist first.
+**Problem:** DexScreener API has rate limits and shows already-pumped tokens.
+
+**Solution:** Real-time WebSocket discovery with age classification.
 
 ```typescript
-// In paper engine, before creating position:
-this.tokenMetadataRepo.getOrCreate(token.address, {
-  symbol: tokenMetadata.symbol,
-  name: token.name || tokenMetadata.symbol,
-  decimals: tokenMetadata.decimals,
-});
+// src/scanner/websocket-discovery.ts
+export enum TokenAge {
+  FRESH = 'fresh',  // < 1 hour old (early movers)
+  WARM = 'warm',    // 1-4 hours old (momentum)
+  STALE = 'stale',  // > 4 hours old (skip)
+}
 ```
 
-### 3. Exit Reason Enum
+**Key Features:**
+- Real-time DexScreener WebSocket connection
+- Age-based strategy parameters
+- Jupiter tradeability filter (only tradeable tokens)
+- Opportunity scoring (0-100 points)
+- Full safety integration (RugCheck + GoPlus)
 
-**Valid exit reasons** (CHECK constraint in database):
-- `STOP_LOSS`
-- `TAKE_PROFIT_1`
-- `TAKE_PROFIT_2`
-- `TRAILING_STOP`
-- `MAX_HOLD_TIME`
-- `EMERGENCY`
-- `MANUAL`
+### 3. Jupiter Tradeability Filter (CRITICAL)
 
-### 4. RPC Configuration
+**Problem:** Not all tokens discovered via DexScreener are tradeable on Jupiter.
 
-**Primary:** Helius RPC (user's API key)
-**Backup:** Solana public RPC (`https://api.mainnet-beta.solana.com`)
+**Solution:** Pre-filter with Jupiter quote check before adding tokens.
 
-**Never use placeholder URLs** like `https://backup.rpc.com`
+```typescript
+// In processToken():
+const jupiterTradeable = await this.checkJupiterTradeability(tokenAddress);
+if (!jupiterTradeable) {
+  return; // Skip tokens we can't trade
+}
+```
+
+**Why this matters:** If we can't get a quote, we can't know the price or execute a trade.
+
+### 4. Exit Strategy (Aggressive Profit Taking)
+
+**Updated Strategy:** Take profits early and often.
+
+| Condition | Action |
+|-----------|--------|
+| Stop Loss | -20% (FRESH) / -25% (WARM) |
+| Target Hit | Sell at 10% (FRESH) or 5% (WARM) |
+| Max Hold | 1 hour (FRESH) / 4 hours (WARM) |
+| Emergency | Liquidity crash → Exit immediately |
+
+**Philosophy:** Consistent 5-10% wins compound better than hoping for 100%+.
 
 ---
 
@@ -194,18 +213,29 @@ Picker/
 │   ├── db/                # Database layer (Better SQLite3)
 │   ├── solana/            # Solana connection, wallet
 │   ├── jupiter/           # Jupiter API client (quotes + swaps)
-│   ├── scanner/           # DexScreener client
+│   ├── scanner/           # DexScreener + WebSocket discovery
+│   │   ├── scanner.ts
+│   │   ├── dexscreener.ts
+│   │   └── websocket-discovery.ts  # NEW: Real-time discovery
 │   ├── safety/            # RugCheck + GoPlus safety
 │   ├── entry/             # Entry logic
-│   ├── exit/              # Exit logic (strategy, executor, orchestrator)
-│   ├── paper/             # Paper trading (engine, wallet, slippage)
-│   ├── bot/               # Main bot orchestrator, config
-│   ├── cli/               # CLI commands
-│   └── index.ts           # Main entry point
+│   │   └── websocket-orchestrator.ts  # NEW: Live trading orchestrator
+│   ├── exit/              # Exit logic (strategy, executor, monitor)
+│   ├── paper/             # Paper trading
+│   │   ├── engine.ts
+│   │   ├── wallet.ts
+│   │   ├── slippage.ts
+│   │   ├── analytics.ts
+│   │   └── websocket-orchestrator.ts  # NEW: Paper trading with WS
+│   ├── bot/               # Main bot orchestrator
+│   └── cli/               # CLI commands
 ├── tests/
-│   ├── unit/              # 364 unit tests
+│   ├── unit/              # Unit tests
 │   ├── integration/       # API integration tests
 │   └── manual/            # Manual test scripts
+│       ├── test-websocket-discovery.ts       # NEW
+│       ├── test-websocket-orchestrator.ts     # NEW
+│       └── test-websocket-paper-trading.ts    # NEW
 └── data/                  # SQLite database
     └── trading-bot.db
 ```
@@ -221,7 +251,8 @@ Picker/
 | DEX Aggregation | @jup-ag/api |
 | Database | Better SQLite3 |
 | Validation | Zod |
-| Real-time | WebSocket (Helius) |
+| WebSocket | DexScreener (token-boosts) |
+| Real-time RPC | Helius |
 | Testing | Vitest |
 
 ---
@@ -232,90 +263,98 @@ Picker/
 |-----|--------|---------|
 | Helius RPC | ✓ Configured | Primary RPC + WebSocket |
 | Jupiter API | ✓ Configured | Quotes + Swaps |
-| GoPlus Security | ✓ Configured | Token safety |
-| RugCheck | ✓ Free | Rug pull detection |
+| GoPlus Security | Optional | Token safety (can use RugCheck only) |
+| RugCheck | ✓ Free | Rug pull detection (primary) |
 
 ---
 
-## When Resuming This Project
+## WebSocket Discovery (NEW 2025-03)
 
-1. **Read CONTEXT.md** - Contains session summary and next steps
-2. **Check if bot is running:** `ps aux | grep tsx`
-3. **Check status:** `npm run status`
-4. **Ask user** - "What would you like to work on today?"
+### How It Works
+
+```
+DexScreener WebSocket → Real-time token boosts
+                          ↓
+                  Age Classification
+                          ↓
+              ┌─────────┴─────────┐
+              ▼                   ▼
+          FRESH (<1hr)        WARM (1-4hr)
+          10% target          5% target
+          -20% stop           -25% stop
+          0.05 SOL            0.10 SOL
+                          ↓
+                  Jupiter Tradeability Check
+                          ↓
+                  Only tradeable tokens
+                          ↓
+                  Safety Checks (RugCheck)
+                          ↓
+                  Add to watchlist / Trade
+```
+
+### Strategy Parameters by Age
+
+| Parameter | FRESH | WARM |
+|-----------|-------|------|
+| **Max Age** | 1 hour | 4 hours |
+| **Target Profit** | 10% | 5% |
+| **Stop Loss** | -20% | -25% |
+| **Max Hold** | 60 min | 240 min |
+| **Position Size** | 0.05 SOL | 0.10 SOL |
+| **Min Liquidity** | $10K | $25K |
+| **Min Volume** | $1K | $5K |
+| **Pump Required** | None | 3%+ |
+
+### Opportunity Scoring (0-100)
+
+| Factor | Points |
+|--------|--------|
+| Safety (HIGH/MED/LOW) | 30 / 15 / 0 |
+| Liquidity (sweet spot) | 0-20 |
+| Volume Spike (h1/h6 ratio) | 0-25 |
+| Early Momentum (FRESH only) | 0-25 |
 
 ---
 
-## Testing Status
+## Known Issues & Current Work
 
-| Test Type | Count | Status |
-|-----------|-------|--------|
-| Unit Tests | 364 | ✅ Passing |
-| Integration | - | ✅ Working |
-| Manual Tests | 3 | ✅ Passing |
+### Current Limitation (2025-03)
 
-### Manual Tests (All Passing)
+**Jupiter Tradeability Filter:**
+- DexScreener WebSocket shows tokens from ALL DEXs
+- Most boosted tokens are NOT on Jupiter
+- Current filter correctly rejects non-tradeable tokens
+- **Result:** Very few tokens pass the Jupiter filter
 
-1. **test-paper-trading.ts** - Full paper trading cycle (scan → entry → exit → DB)
-2. **test-live-swap.ts** - Live SOL → USDC swap (tested with 0.01 SOL)
-3. **test-swap-back.ts** - Live USDC → SOL swap (restored balance)
-
----
-
-## Live Trading Readiness Criteria
-
-Before switching from paper to live trading:
-
-| Criterion | Threshold | Current |
-|-----------|-----------|---------|
-| Minimum Paper Trades | ≥ 20 | ⏳ In progress |
-| Win Rate | ≥ 40% | ⏳ TBD |
-| Max Drawdown | < 30% | ⏳ TBD |
-| Positive P&L | Yes | ⏳ TBD |
-
-**Current Status:** Bot is running in paper trading mode to gather performance data.
-
----
-
-## Known Issues & Fixes
-
-### Fixed Issues
-
-1. **Helius preflight error** - Fixed by setting `skipPreflight: true`
-2. **FOREIGN KEY constraint** - Fixed by creating token metadata before position
-3. **exitReason CHECK constraint** - Fixed by using valid enum values ('MANUAL', not custom strings)
-4. **Backup RPC placeholder** - Fixed tests to use real Solana public RPC
-5. **start:paper not forcing paper mode** - Fixed by setting `process.env.TRADING_MODE = 'paper'` before loading config
-
-### GoPlus API Warnings
-
-The GoPlus security API occasionally returns errors. The system gracefully handles this and continues with other safety checks (RugCheck).
+**Planned Solution:**
+- Switch from DexScreener WebSocket to DexScreener `trending` or `search` API
+- Trending tokens more likely to be on major DEXs (including Jupiter)
+- Still need Jupiter filter, but higher success rate
 
 ---
 
 ## Important Conversations
 
-### User's Specific Quote on Decimal Bug
+### User's Strategy Philosophy (2025-03)
 
-> "some issues i had in the past included which decimal the token was using (6 to 9), as this could skew the sell balance when trying to exit."
+> "we cant be greedy and expect every token to have 25%-150% return (not realistic), even if we get a consistent 5% return. it could add up after a day of trading."
 
-**This is why the decimal handling solution is CRITICAL.**
+**This drove the strategy change to conservative 5-10% targets.**
 
-### User's Paper Trading Requirement
+### User's Discovery Concern (2025-03)
 
-> "We must also paper trade using live data before going live, trying to simulate onchain trading to test our strategy."
+> "i noticed that the 3 coins we filtered had already pumped, so we are buying a top."
 
-**No live trading until 20+ successful paper trades.**
+> "our discovery engine should be finding tokens for us!"
 
-### User's Live Trading Test Instructions
+**This led to implementing WebSocket discovery for early detection.**
 
-> "are there other background services trying to access the api? . kill all and clean up the environment. start with a fresh build"
+### Jupiter Tradeability Question (2025-03)
 
-> "swap a small amount to USDC 0.01"
-> "swap back to sol"
-> "we cannot start trading yet. we need to test the system"
+> "why are we tracking tokens that cant be traded on Jupiter? how would we trade them?"
 
-**Live swap tests completed successfully ✅**
+**Valid point! Added Jupiter tradeability filter to only consider tradeable tokens.**
 
 ---
 
@@ -341,18 +380,6 @@ git push origin main
 
 ---
 
-## Recent Commits
-
-```
-9513bd1 fix: use real Solana public RPC as backup (not placeholder)
-300fa9d fix: paper trading foreign key constraint + test fixes
-d5ff489 fix: update DexScreener API to use token-boosts + token-pairs
-c868d13 feat: implement Phase 5 Main Bot Orchestrator
-9744b8c docs: prepare session handoff - Phase 4 complete
-```
-
----
-
-*Last Updated: 2026-03-10*
-*Session: Paper Trading Validation In Progress*
-*Status: Bot running in paper mode, gathering performance data*
+*Last Updated: 2025-03-10*
+*Session: WebSocket Discovery Integration*
+*Status: Discovery implemented, validating tradeability filter*

@@ -7,3 +7,4 @@
 export * from './validator';
 export * from './executor';
 export * from './orchestrator';
+export * from './websocket-orchestrator';

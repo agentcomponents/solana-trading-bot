@@ -6,3 +6,4 @@
 
 export * from './dexscreener';
 export * from './scanner';
+export * from './websocket-discovery';

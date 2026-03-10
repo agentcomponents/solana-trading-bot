@@ -6,25 +6,82 @@
 
 ## Project Overview
 
-This bot scans for tokens about to pump using the DexScreener CLI tool, executes trades via Jupiter SDK, and compounds profits to grow SOL holdings.
+This bot uses real-time WebSocket discovery to find trading opportunities on Solana:
 
-### Key Specs
-- **Initial Capital:** 0.1 SOL
-- **Strategy:** Enter high-scoring tokens, exit with profit via trailing stops
-- **Compounding:** After tripling to 0.3 SOL, compound 0.1 SOL base after each trade
-- **Position Limiting:** Execute 1 trade at a time
-- **Goal:** Acquire as much SOL as possible (don't hold bags)
+1. **Discovers** tokens in real-time via DexScreener WebSocket
+2. **Classifies** by age: FRESH (<1hr) vs WARM (1-4hr)
+3. **Validates** safety (RugCheck) and tradeability (Jupiter)
+4. **Enters** with age-appropriate strategy (10% FRESH / 5% WARM targets)
+5. **Exits** with profit via automated stop loss/target profit
+
+**User Philosophy:** "I don't want to hold bags. I only want to hold SOL!"
 
 ---
 
-## Current Status
+## Current Status: ✅ FULLY IMPLEMENTED
 
-| Phase | Status | Description |
-|-------|--------|-------------|
-| 📝 Design | ✅ 100% Complete | All 7 design documents complete |
-| 🔨 Implementation | ⏳ Planned | Awaiting design sign-off |
-| 📊 Paper Trading | ⏳ Planned | 20+ trades before going live |
-| 🚀 Live Trading | ⏳ Planned | After paper trading validation |
+| Phase | Status |
+|-------|--------|
+| 📝 Design | ✅ Complete |
+| 🔨 Implementation | ✅ Complete |
+| 📊 Paper Trading | ✅ Complete |
+| 🚀 WebSocket Discovery | ✅ Complete |
+| 🔧 Jupiter Filter | ⏳ Tuning |
+
+---
+
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Copy environment template
+cp .env.example .env
+# Edit .env with your API keys
+
+# Build
+npm run build
+
+# Run tests
+npm test
+
+# Start bot (paper trading mode)
+npm run start:paper
+
+# Start bot (live trading mode)
+npm run start:live
+```
+
+---
+
+## Key Features
+
+### Real-Time Discovery
+- DexScreener WebSocket integration for instant token detection
+- Age-based classification (FRESH vs WARM tokens)
+- Jupiter tradeability pre-filtering
+
+### Age-Based Strategies
+
+| Parameter | FRESH (<1hr) | WARM (1-4hr) |
+|-----------|---------------|--------------|
+| Target Profit | 10% | 5% |
+| Stop Loss | -20% | -25% |
+| Max Hold Time | 1 hour | 4 hours |
+| Position Size | 0.05 SOL | 0.10 SOL |
+
+**Philosophy:** Consistent 5-10% wins compound better than hoping for 100%+.
+
+### Safety Checks
+- **RugCheck.xyz:** Mint authority, freeze authority, liquidity checks
+- **GoPlus Security:** Additional verification layer
+- **Jupiter Filter:** Only tradeable tokens considered
+
+### Paper Trading
+- Real Jupiter quotes, simulated execution
+- Realistic slippage modeling
+- Performance tracking before live trading
 
 ---
 
@@ -32,121 +89,96 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 
 | Component | Technology |
 |-----------|------------|
-| Language | TypeScript / Node.js |
-| RPC Provider | Helius Free Tier |
-| Swap Execution | Jupiter SDK + API |
-| Token Discovery | DexScreener CLI MCP Tool |
-| Database | SQLite |
-| Containerization | Docker |
-| Security APIs | RugCheck, GoPlus, Token Sniffer |
+| Language | TypeScript / Node.js 20+ |
+| Blockchain | @solana/web3.js |
+| DEX Aggregation | @jup-ag/api |
+| Database | Better SQLite3 |
+| Discovery | DexScreener WebSocket |
+| RPC | Helius |
+| Testing | Vitest |
 
 ---
 
-## Key Design Decisions
+## Configuration
 
-### 1. Decimal Precision (CRITICAL)
-- **Problem:** Tokens have 6-9 decimals, causing skewed sell balances
-- **Solution:** Always fetch token metadata at entry, store raw amounts in DB, use stored raw for exit
-- **File:** `design/02-decimal-handling.md`
+### Environment Variables
 
-### 2. Entry Strategy
-- **Timing:** Wait 1-2 confirmations with limit orders (reduces false signals)
-- **Slippage:** 1% on entry
-- **Min Liquidity:** $15,000 USD / 50 SOL pool size
-- **Safety Checks:** RugCheck + GoPlus + Token Sniffer before entry
+```bash
+# Trading Mode
+TRADING_MODE=live
 
-### 3. Exit Strategy
-- **Trailing Stop:** 15% trailing distance, activates after +100% profit
-- **Stop Loss:** 40% max loss
-- **Max Hold Time:** 4 hours
-- **Partial Exits:** 25% at +50%, 25% at +100%, 50% trailing stop
+# Wallet
+WALLET_PRIVATE_KEY=your_private_key_here
 
-### 4. Paper Trading First
-- Minimum 20 paper trades before going live
-- Real Jupiter quotes, simulated execution
-- Realistic slippage modeling
-- Performance analytics dashboard
+# RPC
+HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+HELIUS_WS_URL=wss://mainnet.helius-rpc.com/?api-key=YOUR_KEY
 
-### 5. Compounding Strategy
-- **Build (0.1-0.3 SOL):** Fixed 0.1 SOL, compound +0.05 per 0.05 profit
-- **Growth (0.3-1.0 SOL):** Scale 0.15→0.25 SOL, compound +0.1 per 0.1 profit
-- **Expansion (1.0+ SOL):** 20% of portfolio, profit taking at 50% gain
-- **File:** `design/05-compounding.md`
-
-### 6. Priority Fee Strategy
-- **Entry:** Conservative (10K-50K lamports) - opportunity cost only
-- **Exit:** Aggressive (100K-1M+ lamports) - speed is critical
-- **Dynamic:** Scale based on profit level and urgency
-- **File:** `design/06-priority-fees.md`
-
-### 7. Error Recovery
-- **Multi-RPC:** Primary (Helius) + Backup + Public fallback
-- **Circuit Breaker:** Open after 5 failures, auto-retry after 60s
-- **Transaction Monitoring:** Detect stuck tx after 60s
-- **State Persistence:** Save before/after every trade
-- **File:** `design/07-error-recovery.md`
-
-### 8. Exit Strategy (THE MOST CRITICAL)
-- **Real-Time Monitoring:** Jupiter API polling every 2 seconds
-- **Stop Loss:** -40% → Sell 50%
-- **Take Profit 1:** +50% → Sell 25%
-- **Take Profit 2:** +100% → Sell 25%, activate trailing stop
-- **Trailing Stop:** 15% below peak → Sell remaining 50%
-- **Max Hold:** 4 hours → Exit all remaining
-- **Emergency:** Liquidity crash/rug → Exit all immediately
-- **File:** `design/04-monitoring-exit.md`
-
----
-
-## Project Structure
-
-```
-Picker/
-├── README.md                    # This file
-├── CONTEXT.md                   # Quick session context
-├── CLAUDE.md                    # Claude session instructions
-├── design/                      # Design documents
-│   ├── 01-architecture.md       # System architecture, API stack
-│   ├── 02-decimal-handling.md   # CRITICAL: Token decimals solution
-│   ├── 03-paper-trading.md      # Paper trading architecture
-│   ├── 04-monitoring-exit.md    # Exit strategy & monitoring
-│   ├── 05-compounding.md        # Compounding strategy
-│   ├── 06-priority-fees.md      # Priority fee strategies
-│   └── 07-error-recovery.md     # Error recovery & resilience
-├── docs/                        # API references
-├── src/                         # Source code (when implemented)
-│   ├── config/
-│   ├── db/
-│   ├── solana/
-│   ├── jupiter/
-│   ├── security/
-│   ├── paperTrading/
-│   └── core/
-├── .env.example                 # Configuration template
-├── Dockerfile
-├── docker-compose.yml
-└── ssrn-3247865.pdf             # Trading strategies reference
+# APIs (Optional - RugCheck is free)
+GOPLUS_API_KEY=your_key
 ```
 
 ---
 
-## API Keys Required
+## Documentation
 
-| API | Status | Purpose |
-|-----|--------|---------|
-| Helius RPC | ✓ Have | RPC + WebSocket |
-| Jupiter API | ✓ Have | Quotes + Swaps |
-| GoPlus Security | ⏳ Get | Token safety checks |
-| RugCheck | ✓ Free | No key needed |
-| Token Sniffer | ⏳ Get | Cross-verification |
+- **CLAUDE.md** - Developer instructions and design decisions
+- **design/** - Detailed architecture documents
+  - `01-architecture.md` - System architecture
+  - `02-decimal-handling.md` - Token decimal solution
+  - `03-paper-trading.md` - Paper trading design
+  - `04-monitoring-exit.md` - Exit strategy
+  - `05-compounding.md` - Compounding logic
+  - `06-priority-fees.md` - Priority fee strategies
+  - `07-error-recovery.md` - Error recovery
+  - `08-implementation-plan.md` - Implementation roadmap
 
 ---
 
-## Quick Start (New Session)
+## Architecture
 
-1. Read `CONTEXT.md` for current state
-2. Check `design/` folder for architecture details
-3. Review this README for project overview
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TOKEN DISCOVERY ENGINE                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   DexScreener WebSocket → Age Classification → Jupiter Filter  │
+│                                                                     │
+│   ┌──────────────┐      ┌──────────────────┐                   │
+│   │ FRESH (<1hr) │      │ WARM (1-4hr)    │                   │
+│   │ 10% target   │      │ 5% target       │                   │
+│   │ -20% stop    │      │ -25% stop        │                   │
+│   │ 0.05 SOL     │      │ 0.10 SOL         │                   │
+│   └──────────────┘      └──────────────────┘                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      TRADING ENGINE                           │
+├─────────────────────────────────────────────────────────────┤
+│   • Jupiter API for quotes and swaps                           │
+│   • RugCheck + GoPlus for safety                              │
+│   • Automated stop loss and take profit                         │
+│   • Position monitoring and tracking                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Testing
+
+```bash
+# WebSocket discovery tests
+npx tsx tests/manual/test-websocket-discovery.ts
+npx tsx tests/manual/test-websocket-orchestrator.ts
+npx tsx tests/manual/test-websocket-paper-trading.ts
+
+# Original tests
+npx tsx tests/manual/test-paper-trading.ts
+npx tsx tests/manual/test-live-swap.ts
+npx tsx tests/manual/test-swap-back.ts
+```
 
 ---
 
@@ -156,4 +188,4 @@ MIT
 
 ---
 
-*Last Updated: 2026-03-10*
+*Last Updated: 2025-03-10*

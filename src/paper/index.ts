@@ -57,3 +57,17 @@ export {
   type PerformanceReport,
   type TradeStats,
 } from './analytics';
+
+// ============================================================================
+// WEBSOCKET ORCHESTRATOR
+// ============================================================================
+
+export {
+  WebSocketPaperOrchestrator,
+  createWebSocketPaperOrchestrator,
+  DEFAULT_PAPER_OPTIONS,
+  type PaperTradingOrchestratorOptions,
+  type PaperEntryWithToken,
+  type PaperExitResult,
+  type PaperTradingStats,
+} from './websocket-orchestrator';
