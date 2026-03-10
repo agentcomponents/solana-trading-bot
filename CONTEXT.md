@@ -16,7 +16,7 @@ Build a Solana crypto trading bot that:
 
 ---
 
-## Current Phase: Phase 2 Complete ✅ | Phase 3 Next
+## Current Phase: Phase 3 Partial Complete ✅ | Paper Trading Next
 
 ### ✅ Phase 1: Project Foundation (COMPLETED)
 
@@ -70,16 +70,36 @@ Build a Solana crypto trading bot that:
 | Jupiter API | ✓ User has | Quotes + Swaps |
 | GoPlus Security | ✓ User has | Token safety checks |
 | RugCheck | Free (no key) | Rug pull detection |
-| DexScreener CLI | User has tool | Token scanning (Phase 3) |
+| DexScreener CLI | User has tool | Token scanning |
 
-### ⏳ Phase 3: Trading Engine (NEXT UP)
+### ✅ Phase 3: Trading Engine (PARTIALLY COMPLETE)
 
-**Planned Implementation:**
-1. Token Scanner (DexScreener CLI integration)
-2. Safety Checker (aggregates RugCheck + GoPlus results)
-3. Entry Logic (quote, validate, execute)
-4. Exit Logic (monitoring, trailing stop, partial exits)
-5. Paper Trading Engine (simulated execution)
+**Status:** Safety Aggregator + Token Scanner + Entry Logic complete, 252+ tests passing
+
+| Component | Status | Tests |
+|-----------|--------|-------|
+| Safety Aggregator | ✅ Complete | 18 tests |
+| DexScreener Client | ✅ Complete | 9 tests |
+| Token Scanner | ✅ Complete | 15 tests |
+| Entry Validator | ✅ Complete | 7 tests |
+| Entry Executor | ✅ Complete | 8 tests |
+| Entry Orchestrator | ✅ Complete | - |
+| Exit Logic | ⏳ TODO | - |
+| Paper Trading Engine | ⏳ TODO | - |
+
+**Phase 3 Deliverables (Completed):**
+- ✅ Safety Aggregator: Combines RugCheck + GoPlus into unified decision engine
+- ✅ DexScreener Client: Token scanning, trending pairs, opportunity scoring
+- ✅ Token Scanner: Quick scan, safety filtering, symbol search
+- ✅ Entry Validator: Liquidity, momentum, and safety checks
+- ✅ Entry Executor: Position sizing, Jupiter quotes, dry-run preparation
+- ✅ Entry Orchestrator: Full Scan → Validate → Prepare → Store flow
+- ✅ CRITICAL: tokensReceivedRaw stored from Jupiter for accurate exit
+- ✅ 252+ tests passing, TypeScript compilation clean
+
+**Phase 3 Deliverables (TODO):**
+- ⏳ Exit Logic: Price monitoring, trailing stop, partial exits
+- ⏳ Paper Trading Engine: Simulated execution with realistic slippage
 
 ---
 
@@ -304,38 +324,43 @@ git pull origin main
 ## Last Session Summary (2026-03-10)
 
 **Completed:**
-- ✅ **Phase 2: Database & API Integrations** - Fully implemented and tested
-- ✅ **Database Layer** - Better SQLite3 with WAL mode, repository pattern
-- ✅ **API Integrations** - Helius, Jupiter, GoPlus, RugCheck all tested
-- ✅ **Test Coverage** - 225+ tests passing across all modules
+- ✅ **Phase 3: Trading Engine (Entry)** - Safety Aggregator, Scanner, Entry Logic implemented
+- ✅ **Safety Aggregator** - Unified safety decision combining RugCheck + GoPlus
+- ✅ **DexScreener Client** - Token scanning, trending pairs, opportunity scoring
+- ✅ **Token Scanner** - Quick scan, safety filtering, symbol search
+- ✅ **Entry Validator** - Liquidity, momentum, and safety checks
+- ✅ **Entry Executor** - Position sizing, Jupiter quotes, dry-run preparation
+- ✅ **Entry Orchestrator** - Full Scan → Validate → Prepare → Store flow
+- ✅ **Test Coverage** - 252 tests passing across all modules
 - ✅ **TypeScript Compilation** - Clean build, no errors
-- ✅ **Live Token Testing** - Verified safety APIs with real tokens
 
-**Live Token Testing Results:**
-| Token | Symbol | Result | Key Findings |
-|-------|--------|--------|--------------|
-| xyzR4s6H724bUq6q7MTqWxUnhi8LM5fiKKUq38h8M1P | SHROOM | ⚠️ CAUTION | 59% holder concentration, mutable metadata |
-| 8yW8gpJh4BoXMTHPmt2JWT4XEoQqDEvMcea3WurNpump | Miracil D | ✅ SAFE | Perfect score 1/100, well distributed |
-| 5NFHTLFBQ3GgQ9QwjeWzHkVpCTQwwcko3vDpkakvpump | HATE | 🚨 HIGH RISK | 62% holder concentration, $6K liquidity |
+**Entry Validation Defaults:**
+- Min Liquidity: $15,000
+- Max Liquidity: $500,000 (not too established)
+- Min Price Change 1h: 5% (pumping)
+- Max Price Change 24h: 200% (not already pumped)
+- Safety Check: Required
 
-**Validated Safety Thresholds:**
-- ✅ Minimum liquidity: $15,000 (tokens below $6K flagged)
-- ✅ Holder concentration: Alert when top holder > 50%
-- ✅ RugCheck score: 1-100 scale, lower is better
-- ✅ Authority checks: mintAuthority, freezeAuthority, mutable metadata
+**Position Sizing Strategy:**
+- Build Stage (0.1-0.3 SOL): Fixed 0.1 SOL
+- Growth Stage (0.3-1.0 SOL): Scale 0.15 → 0.25 SOL
+- Expansion Stage (1.0+ SOL): 20% of portfolio
+
+**Critical Decimal Handling:**
+- Entry stores `tokensReceivedRaw` exactly from Jupiter
+- `tokenDecimals` fetched at entry time
+- Exit uses stored raw directly - NO conversion
 
 **Current Status:**
 - Phase 1: ✅ Complete (Utilities, Types, Config)
 - Phase 2: ✅ Complete (Database, API Integrations)
-- Phase 3: ⏳ Next (Trading Engine, Paper Trading)
+- Phase 3: 🟡 Partial (Entry Logic complete, Exit Logic pending)
 
 **Next Session Options:**
-Choose what to implement first:
-1. **Token Scanner** - DexScreener CLI integration to find opportunities
-2. **Safety Aggregator** - Combine RugCheck + GoPlus into unified decision engine
-3. **Entry Logic** - Quote → Validate → Execute swap flow
-4. **Exit Logic** - Price monitoring, trailing stops, partial exits
-5. **Paper Trading Engine** - Simulated execution with realistic slippage
+Choose what to implement next:
+1. **Exit Logic** - Price monitoring, trailing stop, partial exits
+2. **Paper Trading Engine** - Simulated execution with realistic slippage
+3. **Integration Testing** - Full entry flow test with real tokens
 
 ---
 
