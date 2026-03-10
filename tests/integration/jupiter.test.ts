@@ -1,27 +1,23 @@
 /**
  * Jupiter API Integration Tests
  *
- * Tests Jupiter quote and swap API endpoints
+ * Tests Jupiter quote and swap API using the SDK (same as production code)
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import { createJupiterApiClient } from '@jup-ag/api';
 import { config } from 'dotenv';
 
 // Load environment variables
 config();
 
 describe('Jupiter API Integration Tests', () => {
-  const apiKey = process.env['JUPITER_API_KEY'];
-  const baseUrl = 'https://quote-api.jup.ag/v6';
+  // Use the same SDK as production code
+  const jupiterApi = createJupiterApiClient();
 
   beforeAll(() => {
-    if (!apiKey) {
-      throw new Error('JUPITER_API_KEY not configured');
-    }
-  });
-
-  it('should have API key configured', () => {
-    expect(apiKey).toBeDefined();
+    // SDK doesn't require API key for basic quotes
+    console.log('✅ Jupiter SDK initialized');
   });
 
   it('should get a SOL -> USDC quote', async () => {
@@ -30,24 +26,14 @@ describe('Jupiter API Integration Tests', () => {
     // USDC mint
     const outputMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
-    const params = new URLSearchParams({
+    const quote = await jupiterApi.quoteGet({
       inputMint,
       outputMint,
-      amount: '100000000', // 0.1 SOL in lamports
-      slippageBps: '100', // 1%
-      onlyDirectRoutes: 'false',
-      asLegacyTransaction: 'false'
+      amount: 100000000, // 0.1 SOL in lamports
+      slippageBps: 100, // 1%
+      onlyDirectRoutes: false,
+      asLegacyTransaction: false
     });
-
-    const response = await fetch(`${baseUrl}/quote?${params.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
-
-    expect(response.ok).toBe(true);
-
-    const quote = await response.json() as JupiterQuoteResponse;
 
     expect(quote).toBeDefined();
     expect(quote.outAmount).toBeDefined();
@@ -65,22 +51,12 @@ describe('Jupiter API Integration Tests', () => {
     const inputMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC
     const outputMint = 'So11111111111111111111111111111111111111112'; // SOL
 
-    const params = new URLSearchParams({
+    const quote = await jupiterApi.quoteGet({
       inputMint,
       outputMint,
-      amount: '100000000', // 100 USDC (6 decimals)
-      slippageBps: '100' // 1%
+      amount: 100000000, // 100 USDC (6 decimals)
+      slippageBps: 100 // 1%
     });
-
-    const response = await fetch(`${baseUrl}/quote?${params.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
-
-    expect(response.ok).toBe(true);
-
-    const quote = await response.json() as JupiterQuoteResponse;
 
     expect(quote).toBeDefined();
     expect(quote.outAmount).toBeDefined();
@@ -95,23 +71,15 @@ describe('Jupiter API Integration Tests', () => {
     const inputMint = 'So11111111111111111111111111111111111111112'; // SOL
     const outputMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC
 
-    const params = new URLSearchParams({
+    const quote = await jupiterApi.quoteGet({
       inputMint,
       outputMint,
-      amount: '100000000', // 0.1 SOL
-      slippageBps: '100',
+      amount: 100000000, // 0.1 SOL
+      slippageBps: 100,
       swapMode: 'ExactIn'
     });
 
-    const response = await fetch(`${baseUrl}/quote?${params.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
-
-    expect(response.ok).toBe(true);
-
-    const quote = await response.json() as JupiterQuoteResponse;
+    expect(quote).toBeDefined();
 
     console.log('✅ ExactIn Quote:');
     console.log('  input amount:', quote.inAmount);
@@ -123,24 +91,17 @@ describe('Jupiter API Integration Tests', () => {
     const inputMint = 'So11111111111111111111111111111111111111112'; // SOL
     const outputMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC
 
-    const params = new URLSearchParams({
+    const quote = await jupiterApi.quoteGet({
       inputMint,
       outputMint,
-      amount: '100000000', // 0.1 SOL
-      slippageBps: '100',
-      onlyDirectRoutes: 'false',
-      asLegacyTransaction: 'false'
+      amount: 100000000, // 0.1 SOL
+      slippageBps: 100,
+      onlyDirectRoutes: false,
+      asLegacyTransaction: false
     });
 
-    const response = await fetch(`${baseUrl}/quote?${params.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
-
-    expect(response.ok).toBe(true);
-
-    const quote = await response.json() as JupiterQuoteResponse;
+    expect(quote).toBeDefined();
+    expect(quote.routePlan).toBeDefined();
 
     console.log('✅ Route Plan:');
     quote.routePlan?.forEach((route, index) => {
@@ -152,59 +113,39 @@ describe('Jupiter API Integration Tests', () => {
   });
 
   it('should handle invalid mint address gracefully', async () => {
-    const params = new URLSearchParams({
-      inputMint: 'invalid_mint_address',
-      outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      amount: '100000000'
+    let errorOccurred = false;
+
+    try {
+      await jupiterApi.quoteGet({
+        inputMint: 'invalid_mint_address',
+        outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+        amount: 100000000
+      });
+    } catch (error) {
+      errorOccurred = true;
+      console.log('✅ Invalid mint handled correctly:', error instanceof Error ? error.message : error);
+    }
+
+    expect(errorOccurred).toBe(true);
+  });
+
+  it('should get quote for larger amount', async () => {
+    const inputMint = 'So11111111111111111111111111111111111111112'; // SOL
+    const outputMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC
+
+    const quote = await jupiterApi.quoteGet({
+      inputMint,
+      outputMint,
+      amount: 1000000000, // 1 SOL
+      slippageBps: 100
     });
 
-    const response = await fetch(`${baseUrl}/quote?${params.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
+    expect(quote).toBeDefined();
+    expect(quote.outAmount).toBeDefined();
 
-    // Should return error, not throw
-    expect(response.ok).toBe(false);
-
-    console.log('✅ Invalid mint handled correctly:', response.status);
+    console.log('✅ 1 SOL -> USDC Quote:');
+    console.log('  input (SOL):', Number(quote.inAmount) / 1_000_000_000);
+    console.log('  output (USDC):', Number(quote.outAmount) / 1_000_000);
+    console.log('  price impact:', quote.priceImpactPct, '%');
   });
 });
-
-// Types based on Jupiter API response
-interface JupiterQuoteResponse {
-  inputMint: string;
-  inAmount: string;
-  outputMint: string;
-  outAmount: string;
-  otherAmountThreshold: string;
-  swapMode: string;
-  slippageBps: number;
-  platformFee: null | {
-    amount: string;
-    feeBps: number;
-    feeLamports: number;
-  };
-  priceImpactPct: string;
-  routePlan: JupiterRouteStep[];
-  context?: {
-    slot?: number;
-    timeInSeconds?: number;
-  };
-  targetUnit?: string;
-}
-
-interface JupiterRouteStep {
-  swapInfo: {
-    ammKey: string;
-    label: string;
-    inputMint: string;
-    outputMint: string;
-    inAmount: string;
-    outAmount: string;
-    feeAmount: string;
-    feeMint: string;
-    feePct?: number;
-  };
-  percent: number;
-}
