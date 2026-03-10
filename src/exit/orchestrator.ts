@@ -140,6 +140,15 @@ export class ExitOrchestrator {
           continue;
         }
 
+        // Transition ENTERING to ACTIVE
+        if (position.state === 'ENTERING') {
+          await this.positionsRepo.updateState(position.id, 'ACTIVE');
+          logger.debug(
+            { positionId: position.id, tokenMint: position.tokenMint },
+            'Position transitioned from ENTERING to ACTIVE'
+          );
+        }
+
         // Start monitoring
         this.priceMonitor.startMonitoring(position, (update) =>
           this.handlePriceUpdate(position, update)

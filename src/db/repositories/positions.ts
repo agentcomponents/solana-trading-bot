@@ -169,7 +169,7 @@ export class PositionRepository extends BaseRepository<
   findMonitored(): Position[] {
     const sql = `
       SELECT * FROM ${this.tableName}
-      WHERE state IN ('ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING', 'EXITING')
+      WHERE state IN ('ENTERING', 'ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING', 'EXITING')
         AND (exitTimestamp IS NULL OR exitTimestamp > ?)
       ORDER BY entryTimestamp DESC
     `;
