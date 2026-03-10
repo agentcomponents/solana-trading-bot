@@ -27,6 +27,7 @@ export interface CreatePositionInput {
   entryPricePerToken: number;
   tokensReceivedRaw: string; // CRITICAL: Raw from Jupiter
   tokenDecimals: number;
+  entryScore?: number; // 0-100 score at entry
   peakPricePerToken?: number;
   peakTimestamp?: number;
 }
@@ -84,6 +85,7 @@ export class PositionRepository extends BaseRepository<
       entryPricePerToken: input.entryPricePerToken,
       tokensReceivedRaw: input.tokensReceivedRaw,
       tokenDecimals: input.tokenDecimals,
+      entryScore: input.entryScore ?? null,
       exitTimestamp: null,
       exitSolReceived: null,
       exitPricePerToken: null,
@@ -97,11 +99,11 @@ export class PositionRepository extends BaseRepository<
     const sql = `
       INSERT INTO positions (
         id, state, tokenMint, entrySolSpent, entryTimestamp,
-        entryPricePerToken, tokensReceivedRaw, tokenDecimals,
+        entryPricePerToken, tokensReceivedRaw, tokenDecimals, entryScore,
         exitTimestamp, exitSolReceived, exitPricePerToken,
         exitReason, peakPricePerToken, peakTimestamp,
         createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `;
 
@@ -114,6 +116,7 @@ export class PositionRepository extends BaseRepository<
       position.entryPricePerToken,
       position.tokensReceivedRaw,
       position.tokenDecimals,
+      position.entryScore,
       position.exitTimestamp,
       position.exitSolReceived,
       position.exitPricePerToken,

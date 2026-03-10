@@ -114,7 +114,7 @@ async function sendAlert(message: string): Promise<void> {
 async function checkNewEntries(): Promise<void> {
   try {
     const positions = db.prepare(`
-      SELECT id, tokenMint, entrySolSpent, entryTimestamp, entryPricePerToken, tokensReceivedRaw, state
+      SELECT id, tokenMint, entrySolSpent, entryTimestamp, entryPricePerToken, tokensReceivedRaw, entryScore, state
       FROM positions 
       WHERE state IN ('ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING')
       ORDER BY entryTimestamp DESC
@@ -132,6 +132,7 @@ async function checkNewEntries(): Promise<void> {
     const entrySol = formatSol(pos.entrySolSpent);
     const entryTime = formatTime(pos.entryTimestamp);
     const entryPrice = formatPrice(pos.entryPricePerToken);
+    const score = pos.entryScore !== null ? `${pos.entryScore}/100` : 'N/A';
     
     // Get wallet balance
     let walletBalance = '0.100000';
@@ -148,6 +149,7 @@ async function checkNewEntries(): Promise<void> {
       `${EMOJI.TOKEN} Token: \`${symbol}\`\n` +
       `📊 Size: \`${entrySol} SOL\`\n` +
       `💵 Entry Price: \`${entryPrice} SOL\`\n` +
+      `📈 Score: \`${score}\`\n` +
       `⏰ Time: \`${entryTime}\`\n` +
       `${EMOJI.WALLET} Wallet: \`${walletBalance} SOL\`\n` +
       `[DexScreener](https://dexscreener.com/solana/${pos.tokenMint})`

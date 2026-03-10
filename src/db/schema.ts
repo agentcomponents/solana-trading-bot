@@ -48,6 +48,9 @@ export interface Position {
   tokensReceivedRaw: string; // Raw from Jupiter (BN as string)
   tokenDecimals: number; // Fetched at entry time
 
+  // Score at entry (0-100)
+  entryScore: number | null;
+
   // Exit data (null until exit)
   exitTimestamp: number | null;
   exitSolReceived: string | null; // Raw lamports received
@@ -228,6 +231,7 @@ CREATE TABLE IF NOT EXISTS positions (
   entryPricePerToken REAL NOT NULL,
   tokensReceivedRaw TEXT NOT NULL,
   tokenDecimals INTEGER NOT NULL CHECK(tokenDecimals >= 0 AND tokenDecimals <= 9),
+  entryScore INTEGER,
   exitTimestamp INTEGER,
   exitSolReceived TEXT,
   exitPricePerToken REAL,

@@ -92,7 +92,7 @@ export class PaperTradingEngine {
    */
   async executeEntry(
     token: TokenSearchResult,
-    tokenMetadata: { decimals: number; symbol: string }
+    tokenMetadata: { decimals: number; symbol: string; score?: number }
   ): Promise<PaperEntryResult> {
     try {
       // 1. Check wallet balance
@@ -160,6 +160,7 @@ export class PaperTradingEngine {
         entryPricePerToken: entryPriceSol,
         tokensReceivedRaw: actualOutputRaw, // CRITICAL: Store simulated amount
         tokenDecimals: tokenMetadata.decimals,
+        entryScore: tokenMetadata.score ?? token.opportunityScore,
         peakPricePerToken: entryPriceSol,
         peakTimestamp: Date.now(),
       };

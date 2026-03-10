@@ -363,6 +363,7 @@ export class TradingBot {
         const result = await this.paperEngine.executeEntry(signal, {
           decimals: 0, // Will fetch from metadata
           symbol: signal.symbol,
+          score: signal.opportunityScore,
         });
 
         if (result.success) {
