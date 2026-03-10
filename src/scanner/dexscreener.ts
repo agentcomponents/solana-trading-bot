@@ -316,8 +316,9 @@ export async function getBoostedTokens(
   logger.debug({ limit }, 'Fetching boosted tokens from DexScreener');
 
   try {
-    // Try cache first
-    const cacheKey = `boosts:latest:solana:${limit}`;
+    // Use a single cache key for ALL Solana boosts (without limit in key)
+    // We'll slice the cached data based on the limit parameter
+    const cacheKey = 'boosts:latest:solana';
 
     const fetcher = async (): Promise<DexScreenerTokenBoost[]> => {
       await dexScreenerLimiter.waitForSlow();
@@ -347,7 +348,7 @@ export async function getBoostedTokens(
         return [];
       }
 
-      // Filter for Solana tokens only
+      // Filter for Solana tokens only - cache ALL of them
       const solanaBoosts = data.filter(
         (boost) => boost.chainId === 'solana'
       );
@@ -357,17 +358,18 @@ export async function getBoostedTokens(
         'Filtered boosts by chain'
       );
 
-      return solanaBoosts.slice(0, limit);
+      return solanaBoosts;
     };
 
-    // Use cache
+    // Use cache - get full Solana boosts
     const { data, cached } = await boostsCache.getOrFetch(cacheKey, fetcher);
 
     if (cached) {
       logger.debug({ cached: true, count: data.length }, 'Returning cached boosts');
     }
 
-    return data;
+    // Slice based on limit AFTER fetching from cache
+    return data.slice(0, limit);
   } catch (error) {
     logger.error({ error }, 'Failed to fetch boosted tokens');
     return [];
@@ -386,8 +388,8 @@ export async function getTopBoostedTokens(
   logger.debug({ limit }, 'Fetching top boosted tokens from DexScreener');
 
   try {
-    // Try cache first
-    const cacheKey = `boosts:top:solana:${limit}`;
+    // Use a single cache key for ALL Solana boosts (without limit in key)
+    const cacheKey = 'boosts:top:solana';
 
     const fetcher = async (): Promise<DexScreenerTokenBoost[]> => {
       await dexScreenerLimiter.waitForSlow();
@@ -416,22 +418,23 @@ export async function getTopBoostedTokens(
         return [];
       }
 
-      // Filter for Solana tokens only
+      // Filter for Solana tokens only - cache ALL of them
       const solanaBoosts = data.filter(
         (boost) => boost.chainId === 'solana'
       );
 
-      return solanaBoosts.slice(0, limit);
+      return solanaBoosts;
     };
 
-    // Use cache
+    // Use cache - get full Solana boosts
     const { data, cached } = await boostsCache.getOrFetch(cacheKey, fetcher);
 
     if (cached) {
       logger.debug({ cached: true, count: data.length }, 'Returning cached top boosts');
     }
 
-    return data;
+    // Slice based on limit AFTER fetching from cache
+    return data.slice(0, limit);
   } catch (error) {
     logger.error({ error }, 'Failed to fetch top boosted tokens');
     return [];
