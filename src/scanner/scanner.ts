@@ -10,13 +10,13 @@ import type { TokenSearchResult } from './dexscreener';
 import {
   getTrendingPairs,
   searchBySymbol,
-  calculateOpportunityScore,
 } from './dexscreener';
 import {
   checkTokenSafetyAggregate,
   filterSafeTokens,
   type SafetyThresholds,
 } from '../safety/aggregator';
+import { scoreToken, calculateRiskProfile } from './scoring';
 
 // ============================================================================
 // TYPES
@@ -26,12 +26,11 @@ export interface ScanCriteria {
   minLiquidityUsd?: number;
   maxLiquidityUsd?: number;
   minVolume24h?: number;
+  minTxnsH1?: number;          // Minimum transactions per hour
   minPriceChange1h?: number;
   maxPairAgeHours?: number;
   minPairAgeHours?: number;
-  // Volume spike detection
-  minVolumeRatio?: number;  // h1/h6 volume ratio (e.g., 2x = h1 volume is 2x what you'd expect)
-  minBuyPressure?: number;   // buy/sell ratio (e.g., 1.5 = 1.5x more buys than sells)
+  minScore?: number;           // Minimum opportunity score (0-100)
 }
 
 export interface ScanResult {
@@ -49,6 +48,17 @@ export interface ScanResult {
   pairAge: number;
   opportunityScore: number;
   txnsH24: { buys: number; sells: number };
+  tags?: string[];
+  scoreComponents?: {
+    volume: number;
+    transactions: number;
+    liquidity: number;
+    momentum: number;
+    flow: number;
+    boost: number;
+    recency: number;
+    profile: number;
+  };
   safety: {
     safe: boolean | null;
     confidence: 'high' | 'medium' | 'low';
@@ -68,15 +78,15 @@ export interface ScannerOptions {
 // ============================================================================
 
 export const DEFAULT_SCAN_CRITERIA: ScanCriteria = {
-  // Loosened filters for better token discovery (2026-03-10)
-  minLiquidityUsd: 10000,      // Lowered from 15000 - allow smaller pools
-  maxLiquidityUsd: 5000000,    // Max $5M to avoid very established tokens
-  minVolume24h: 1000,          // Lowered from 5000 - allow lower volume tokens
-  minPriceChange1h: 1,         // Lowered from 2% - catch smaller moves early
-  maxPairAgeHours: 6,          // Maximum 6 hours old (catch early moves)
-  minPairAgeHours: 0.25,       // At least 15 minutes old (avoid brand new rugs)
-  minVolumeRatio: 0.8,         // Lowered from 1.5 - catch volume spikes earlier
-  minBuyPressure: 0.9,         // Lowered from 1.3 - allow balanced buy/sell
+  // Discovery profile - catches early gems (based on DexScreener CLI)
+  minLiquidityUsd: 8000,       // $8K min liquidity
+  maxLiquidityUsd: 5000000,    // $5M max (avoid very established)
+  minVolume24h: 10000,         // $10K min 24h volume
+  minTxnsH1: 5,                // Minimum 5 transactions/hour
+  minPriceChange1h: -5,        // Allow dips (-5%) to pumps (+∞)
+  maxPairAgeHours: 72,         // 3 days max (fresh pairs)
+  minPairAgeHours: 0.25,       // 15 min minimum (avoid brand new rugs)
+  minScore: 50,                // Minimum score 50/100
 };
 
 // ============================================================================
@@ -130,7 +140,13 @@ export async function scanTrendingTokens(
   const results: ScanResult[] = [];
 
   for (const candidate of candidates.slice(0, maxResults)) {
-    const score = calculateOpportunityScore(candidate);
+    // Use new 8-component scoring
+    const scoreResult = scoreToken(candidate);
+    
+    // Skip if below minimum score
+    if (criteria.minScore && scoreResult.score < criteria.minScore) {
+      continue;
+    }
 
     const result: ScanResult = {
       address: candidate.address,
@@ -145,8 +161,10 @@ export async function scanTrendingTokens(
       priceChangeH1: candidate.priceChangeH1,
       priceChangeH24: candidate.priceChangeH24,
       pairAge: candidate.pairAge,
-      opportunityScore: score,
+      opportunityScore: scoreResult.score,
       txnsH24: candidate.txnsH24,
+      tags: scoreResult.tags,
+      scoreComponents: scoreResult.components,
       safety: {
         safe: true, // Already filtered
         confidence: 'high', // Placeholder, will be filled if we run full check
@@ -247,31 +265,46 @@ export async function quickScan(
 
   const candidates = pairs.filter(pair => matchesCriteria(pair, criteria));
 
-  const results: ScanResult[] = candidates.slice(0, maxResults).map(candidate => ({
-    address: candidate.address,
-    name: candidate.name,
-    symbol: candidate.symbol,
-    chainId: candidate.chainId,
-    dexId: candidate.dexId,
-    pairAddress: candidate.pairAddress,
-    priceUsd: candidate.priceUsd,
-    liquidity: candidate.liquidity,
-    volumeH24: candidate.volumeH24,
-    priceChangeH1: candidate.priceChangeH1,
-    priceChangeH24: candidate.priceChangeH24,
-    pairAge: candidate.pairAge,
-    opportunityScore: candidate.opportunityScore ?? 50,
-    txnsH24: candidate.txnsH24,
-    safety: {
-      safe: null, // Unknown
-      confidence: 'low',
-      reasons: ['Safety check not performed'],
-    },
-  }));
+  // Calculate scores and filter by minScore
+  const scored: ScanResult[] = [];
+  
+  for (const candidate of candidates) {
+    const scoreResult = scoreToken(candidate);
+    
+    // Skip if below minimum score
+    if (criteria.minScore && scoreResult.score < criteria.minScore) {
+      continue;
+    }
 
-  results.sort((a, b) => b.opportunityScore - a.opportunityScore);
+    scored.push({
+      address: candidate.address,
+      name: candidate.name,
+      symbol: candidate.symbol,
+      chainId: candidate.chainId,
+      dexId: candidate.dexId,
+      pairAddress: candidate.pairAddress,
+      priceUsd: candidate.priceUsd,
+      liquidity: candidate.liquidity,
+      volumeH24: candidate.volumeH24,
+      priceChangeH1: candidate.priceChangeH1,
+      priceChangeH24: candidate.priceChangeH24,
+      pairAge: candidate.pairAge,
+      opportunityScore: scoreResult.score,
+      txnsH24: candidate.txnsH24,
+      tags: scoreResult.tags,
+      scoreComponents: scoreResult.components,
+      safety: {
+        safe: null, // Unknown
+        confidence: 'low',
+        reasons: ['Safety check not performed'],
+      },
+    });
+  }
 
-  return results;
+  // Sort by score
+  scored.sort((a, b) => b.opportunityScore - a.opportunityScore);
+
+  return scored.slice(0, maxResults);
 }
 
 /**
@@ -334,43 +367,25 @@ function matchesCriteria(
     return false;
   }
 
-  // Price change check (pumping) - EARLY at only 2%
-  if (criteria.minPriceChange1h && pair.priceChangeH1 < criteria.minPriceChange1h) {
+  // Transaction count check (per hour)
+  if (criteria.minTxnsH1) {
+    const txnsH1 = pair.txnsH1 || 0;
+    if (txnsH1 < criteria.minTxnsH1) {
+      return false;
+    }
+  }
+
+  // Price change check (allow dips and pumps)
+  if (criteria.minPriceChangeH1 && pair.priceChangeH1 < criteria.minPriceChangeH1) {
     return false;
   }
 
-  // Pair age check (15 min to 6 hours)
+  // Pair age check
   if (criteria.maxPairAgeHours && pair.pairAge > criteria.maxPairAgeHours) {
     return false;
   }
   if (criteria.minPairAgeHours && pair.pairAge < criteria.minPairAgeHours) {
     return false;
-  }
-
-  // Volume spike check: h1 volume should be elevated compared to h6
-  if (criteria.minVolumeRatio && pair.volumeH6) {
-    // If h6 has X volume, h1 should have > X/6 * ratio
-    // For example: if h6 = $60K (so $10K/hour avg), and ratio = 1.5
-    // Then h1 should be > $10K * 1.5 = $15K
-    const expectedH1Volume = pair.volumeH6 / 6;
-    const actualH1Volume = pair.volumeH1 || 0;
-    if (actualH1Volume < expectedH1Volume * criteria.minVolumeRatio) {
-      return false;
-    }
-  }
-
-  // Buy pressure check: more buys than sells
-  if (criteria.minBuyPressure && pair.txnsH24) {
-    const { buys, sells } = pair.txnsH24;
-    if (sells > 0) {
-      const buyRatio = buys / sells;
-      if (buyRatio < criteria.minBuyPressure) {
-        return false;
-      }
-    } else if (buys === 0) {
-      // No transactions at all
-      return false;
-    }
   }
 
   return true;

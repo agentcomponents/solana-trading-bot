@@ -145,6 +145,7 @@ export interface TokenSearchResult {
   priceChangeH24: number;
   priceChangeH1: number;
   txnsH24: { buys: number; sells: number };
+  txnsH1?: number;    // Transactions in last 1 hour
   pairAge: number; // Hours since pair creation
   opportunityScore?: number; // Calculated opportunity score (0-100)
 }
@@ -655,6 +656,9 @@ function pairToSearchResult(pair: DexScreenerPair): TokenSearchResult {
     ? (now - pair.pairCreatedAt) / (1000 * 60 * 60) // Hours
     : 0;
 
+  // Calculate txnsH1 from h1 transactions
+  const txnsH1 = (pair.txns.h1?.buys || 0) + (pair.txns.h1?.sells || 0);
+
   return {
     address: pair.baseToken.address,
     name: pair.baseToken.name,
@@ -673,6 +677,7 @@ function pairToSearchResult(pair: DexScreenerPair): TokenSearchResult {
       buys: pair.txns.h24?.buys || 0,
       sells: pair.txns.h24?.sells || 0,
     },
+    txnsH1,
     pairAge,
     opportunityScore: calculateOpportunityScoreFromPair(pair),
   };
