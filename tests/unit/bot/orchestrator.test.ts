@@ -21,7 +21,7 @@ describe('bot/orchestrator', () => {
     process.env.WALLET_PRIVATE_KEY = '1'.repeat(64);
     process.env.HELIUS_RPC_URL = 'https://rpc.helius.xyz';
     process.env.HELIUS_WS_URL = 'wss://rpc.helius.xyz';
-    process.env.BACKUP_RPC_URL = 'https://backup.rpc.com';
+    process.env.BACKUP_RPC_URL = 'https://api.mainnet-beta.solana.com';
     process.env.DATABASE_PATH = ':memory:';
     process.env.TRADING_MODE = 'paper';
 
