@@ -39,6 +39,16 @@ const EMOJI = {
 };
 
 /**
+ * Format price (handle scientific notation)
+ */
+function formatPrice(price: number): string {
+  if (price < 0.00000001) {
+    return price.toExponential(4);
+  }
+  return price.toFixed(12);
+}
+
+/**
  * Format SOL amount
  */
 function formatSol(lamports: string | number): string {
@@ -95,7 +105,7 @@ async function sendAlert(message: string): Promise<void> {
 async function checkNewEntries(): Promise<void> {
   try {
     const positions = db.prepare(`
-      SELECT id, tokenMint, entrySolSpent, entryTimestamp, entryPricePerToken, state
+      SELECT id, tokenMint, entrySolSpent, entryTimestamp, entryPricePerToken, tokensReceivedRaw, state
       FROM positions 
       WHERE state IN ('ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING')
       ORDER BY entryTimestamp DESC
@@ -112,6 +122,7 @@ async function checkNewEntries(): Promise<void> {
     const symbol = getTokenSymbol(pos.tokenMint);
     const entrySol = formatSol(pos.entrySolSpent);
     const entryTime = formatTime(pos.entryTimestamp);
+    const entryPrice = formatPrice(pos.entryPricePerToken);
     
     // Get wallet balance
     let walletBalance = '0.100000';
@@ -127,6 +138,7 @@ async function checkNewEntries(): Promise<void> {
       `${EMOJI.ENTRY} *NEW ENTRY*\n\n` +
       `${EMOJI.TOKEN} Token: \`${symbol}\`\n` +
       `📊 Size: \`${entrySol} SOL\`\n` +
+      `💵 Entry Price: \`${entryPrice} SOL\`\n` +
       `⏰ Time: \`${entryTime}\`\n` +
       `${EMOJI.WALLET} Wallet: \`${walletBalance} SOL\`\n` +
       `[DexScreener](https://dexscreener.com/solana/${pos.tokenMint})`
@@ -142,7 +154,8 @@ async function checkNewEntries(): Promise<void> {
 async function checkExits(): Promise<void> {
   try {
     const exits = db.prepare(`
-      SELECT id, tokenMint, entrySolSpent, exitSolReceived, exitTimestamp, exitReason, state
+      SELECT id, tokenMint, entrySolSpent, tokensReceivedRaw, entryTimestamp, entryPricePerToken, 
+             exitTimestamp, exitReason, state, exitPricePerToken
       FROM positions 
       WHERE state IN ('CLOSED', 'FAILED') 
         AND exitTimestamp > ?
@@ -158,6 +171,10 @@ async function checkExits(): Promise<void> {
       lastExitTimestamp = pos.exitTimestamp;
       const symbol = getTokenSymbol(pos.tokenMint);
       const entrySol = formatSol(pos.entrySolSpent);
+      const tokensReceived = Number(pos.tokensReceivedRaw || 0).toLocaleString();
+      const entryPrice = formatPrice(pos.entryPricePerToken);
+      const exitPrice = pos.exitPricePerToken ? formatPrice(pos.exitPricePerToken) : 'N/A';
+      const entryTime = formatTime(pos.entryTimestamp);
       const exitTime = formatTime(pos.exitTimestamp);
       
       // Get wallet balance
@@ -191,9 +208,14 @@ async function checkExits(): Promise<void> {
       await sendAlert(
         `${emoji} *${title}*\n\n` +
         `${EMOJI.TOKEN} Token: \`${symbol}\`\n` +
+        `📊 Size: \`${entrySol} SOL\`\n` +
+        `🪙 Tokens: \`${tokensReceived}\`\n` +
+        `💵 Entry Price: \`${entryPrice} SOL\`\n` +
+        `💱 Exit Price: \`${exitPrice} SOL\`\n` +
         `📊 Reason: \`${pos.exitReason || 'Unknown'}\`\n` +
         `📈 P&L: \`${pnlPercent}\`\n` +
-        `⏰ Time: \`${exitTime}\`\n` +
+        `⏰ Entry: \`${entryTime}\`\n` +
+        `⏰ Exit: \`${exitTime}\`\n` +
         `${EMOJI.WALLET} Wallet: \`${walletBalance} SOL\`\n` +
         `[DexScreener](https://dexscreener.com/solana/${pos.tokenMint})`
       );
