@@ -21,8 +21,8 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 📝 Design | ✅ Complete | Architecture, decimal handling, paper trading |
-| 🔨 Implementation | 🔄 Pending | Awaiting design sign-off |
+| 📝 Design | 🔄 80% Complete | Architecture, decimals, paper trading, compounding done; error recovery, monitoring pending |
+| 🔨 Implementation | ⏳ Planned | Awaiting design sign-off |
 | 📊 Paper Trading | ⏳ Planned | 20+ trades before going live |
 | 🚀 Live Trading | ⏳ Planned | After paper trading validation |
 
@@ -66,6 +66,12 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 - Real Jupiter quotes, simulated execution
 - Realistic slippage modeling
 - Performance analytics dashboard
+
+### 5. Compounding Strategy
+- **Build (0.1-0.3 SOL):** Fixed 0.1 SOL, compound +0.05 per 0.05 profit
+- **Growth (0.3-1.0 SOL):** Scale 0.15→0.25 SOL, compound +0.1 per 0.1 profit
+- **Expansion (1.0+ SOL):** 20% of portfolio, profit taking at 50% gain
+- **File:** `design/05-compounding.md`
 
 ---
 
