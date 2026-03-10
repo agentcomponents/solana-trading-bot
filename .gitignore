@@ -39,5 +39,9 @@ tmp/
 temp/
 *.tmp
 
+# Testing
+coverage/
+.nyc_output/
+
 # Claude memory (auto-generated)
 .claude/projects/
