@@ -310,9 +310,24 @@ export class TradingBot {
         return;
       }
 
+      // Filter out tokens already in active positions
+      const activeTokenMints = this.getActiveTokenMints();
+      const filteredSignals = signals.filter(s => !activeTokenMints.has(s.address || s.tokenMint));
+
+      if (filteredSignals.length < signals.length) {
+        logger.debug(
+          { filtered: signals.length - filteredSignals.length, alreadyHeld: activeTokenMints.size },
+          'Filtered out tokens already in portfolio'
+        );
+      }
+
+      if (filteredSignals.length === 0) {
+        return;
+      }
+
       // Execute entries (up to max positions remaining)
       const slotsRemaining = this.config.maxPositions - activeCount;
-      const entriesToExecute = signals.slice(0, slotsRemaining);
+      const entriesToExecute = filteredSignals.slice(0, slotsRemaining);
 
       for (const signal of entriesToExecute) {
         const result = await this.executeEntry(signal);
@@ -443,6 +458,15 @@ export class TradingBot {
     const positionsRepo = createPositionRepository(this.db);
     const activePositions = positionsRepo.findActive();
     return activePositions.length;
+  }
+
+  /**
+   * Get list of token mints already in active positions
+   */
+  private getActiveTokenMints(): Set<string> {
+    const positionsRepo = createPositionRepository(this.db);
+    const activePositions = positionsRepo.findActive();
+    return new Set(activePositions.map(p => p.tokenMint));
   }
 
   /**
