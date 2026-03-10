@@ -85,16 +85,17 @@ export class RateLimiter {
 /**
  * Two-tier rate limiter for DexScreener API
  *
- * Slow tier: 60 req/min (boosts, profiles)
- * Fast tier: 300 req/min (search, pairs, tokens)
+ * Using CONSERVATIVE limits (50% of documented) to avoid 429s:
+ * - Slow tier: 30 req/min (documented: 60) for boosts, profiles
+ * - Fast tier: 150 req/min (documented: 300) for search, pairs, tokens
  */
 export class DexScreenerRateLimiter {
   readonly slow: RateLimiter;
   readonly fast: RateLimiter;
 
   constructor() {
-    this.slow = new RateLimiter({ requestsPerMinute: 60 });
-    this.fast = new RateLimiter({ requestsPerMinute: 300 });
+    this.slow = new RateLimiter({ requestsPerMinute: 30 });
+    this.fast = new RateLimiter({ requestsPerMinute: 150 });
   }
 
   /**

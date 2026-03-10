@@ -4,14 +4,18 @@
  * Fetches token data from DexScreener for finding opportunities.
  * Documentation: https://docs.dexscreener.com/api/reference
  *
- * Rate Limits (per official docs):
- * - Slow tier (60 req/min): token-boosts, token-profiles, community-takeovers, ads
- * - Fast tier (300 req/min): dex/search, dex/pairs, token-pairs, tokens (batch)
+ * Rate Limits (conservative - 50% of documented to avoid 429s):
+ * - Slow tier (30 req/min): token-boosts, token-profiles, community-takeovers, ads
+ * - Fast tier (150 req/min): dex/search, dex/pairs, token-pairs, tokens (batch)
+ *
+ * Caching:
+ * - Boosted tokens: 2.5 minute cache (reduces API calls by ~80%)
  */
 
 import { logger } from '../utils/logger';
 import { retry } from '../utils/retry';
 import { dexScreenerLimiter } from '../utils/rate-limiter';
+import { boostsCache } from '../utils/cache';
 
 // ============================================================================
 // CONFIG
@@ -20,10 +24,10 @@ import { dexScreenerLimiter } from '../utils/rate-limiter';
 const API_BASE = 'https://api.dexscreener.com';
 const USER_AGENT = 'SolanaTradingBot/1.0';
 
-// Rate limit tiers (per DexScreener API docs)
+// Conservative rate limits (50% of documented)
 const RATE_LIMITS = {
-  slow: 60, // boosts, profiles, community-takeovers
-  fast: 300, // search, pairs, tokens (batch)
+  slow: 30, // boosts, profiles, community-takeovers (documented: 60)
+  fast: 150, // search, pairs, tokens (batch) (documented: 300)
 } as const;
 
 // ============================================================================
@@ -301,8 +305,10 @@ export async function searchBySymbol(
 
 /**
  * Get latest boosted tokens from DexScreener
- * Uses /token-boosts/latest/v1 endpoint (slow tier: 60 req/min)
+ * Uses /token-boosts/latest/v1 endpoint (slow tier: 30 req/min conservative)
  * Returns tokens that are being actively promoted
+ *
+ * Results are cached for 2.5 minutes to reduce API calls
  */
 export async function getBoostedTokens(
   limit: number = 50
@@ -310,44 +316,58 @@ export async function getBoostedTokens(
   logger.debug({ limit }, 'Fetching boosted tokens from DexScreener');
 
   try {
-    await dexScreenerLimiter.waitForSlow();
+    // Try cache first
+    const cacheKey = `boosts:latest:solana:${limit}`;
 
-    const response = await retry(
-      async () => {
-        const res = await fetch(`${API_BASE}/token-boosts/latest/v1`, {
-          headers: {
-            'User-Agent': USER_AGENT,
-            'Accept': 'application/json',
-          },
-        });
+    const fetcher = async (): Promise<DexScreenerTokenBoost[]> => {
+      await dexScreenerLimiter.waitForSlow();
 
-        if (!res.ok) {
-          throw new Error(`DexScreener boosts API returned ${res.status}`);
-        }
+      const response = await retry(
+        async () => {
+          const res = await fetch(`${API_BASE}/token-boosts/latest/v1`, {
+            headers: {
+              'User-Agent': USER_AGENT,
+              'Accept': 'application/json',
+            },
+          });
 
-        return res;
-      },
-      { maxAttempts: 3, initialDelayMs: 1000 }
-    );
+          if (!res.ok) {
+            throw new Error(`DexScreener boosts API returned ${res.status}`);
+          }
 
-    const data = (await response.json()) as DexScreenerTokenBoost[];
+          return res;
+        },
+        { maxAttempts: 3, initialDelayMs: 1000 }
+      );
 
-    if (!Array.isArray(data)) {
-      logger.debug({ dataType: typeof data }, 'Boosts API returned non-array');
-      return [];
+      const data = (await response.json()) as DexScreenerTokenBoost[];
+
+      if (!Array.isArray(data)) {
+        logger.debug({ dataType: typeof data }, 'Boosts API returned non-array');
+        return [];
+      }
+
+      // Filter for Solana tokens only
+      const solanaBoosts = data.filter(
+        (boost) => boost.chainId === 'solana'
+      );
+
+      logger.debug(
+        { total: data.length, solana: solanaBoosts.length },
+        'Filtered boosts by chain'
+      );
+
+      return solanaBoosts.slice(0, limit);
+    };
+
+    // Use cache
+    const { data, cached } = await boostsCache.getOrFetch(cacheKey, fetcher);
+
+    if (cached) {
+      logger.debug({ cached: true, count: data.length }, 'Returning cached boosts');
     }
 
-    // Filter for Solana tokens only
-    const solanaBoosts = data.filter(
-      (boost) => boost.chainId === 'solana'
-    );
-
-    logger.debug(
-      { total: data.length, solana: solanaBoosts.length },
-      'Filtered boosts by chain'
-    );
-
-    return solanaBoosts.slice(0, limit);
+    return data;
   } catch (error) {
     logger.error({ error }, 'Failed to fetch boosted tokens');
     return [];
@@ -356,7 +376,9 @@ export async function getBoostedTokens(
 
 /**
  * Get top boosted tokens (most active boosts)
- * Uses /token-boosts/top/v1 endpoint (slow tier: 60 req/min)
+ * Uses /token-boosts/top/v1 endpoint (slow tier: 30 req/min conservative)
+ *
+ * Results are cached for 2.5 minutes to reduce API calls
  */
 export async function getTopBoostedTokens(
   limit: number = 50
@@ -364,38 +386,52 @@ export async function getTopBoostedTokens(
   logger.debug({ limit }, 'Fetching top boosted tokens from DexScreener');
 
   try {
-    await dexScreenerLimiter.waitForSlow();
+    // Try cache first
+    const cacheKey = `boosts:top:solana:${limit}`;
 
-    const response = await retry(
-      async () => {
-        const res = await fetch(`${API_BASE}/token-boosts/top/v1`, {
-          headers: {
-            'User-Agent': USER_AGENT,
-            'Accept': 'application/json',
-          },
-        });
+    const fetcher = async (): Promise<DexScreenerTokenBoost[]> => {
+      await dexScreenerLimiter.waitForSlow();
 
-        if (!res.ok) {
-          throw new Error(`DexScreener boosts API returned ${res.status}`);
-        }
+      const response = await retry(
+        async () => {
+          const res = await fetch(`${API_BASE}/token-boosts/top/v1`, {
+            headers: {
+              'User-Agent': USER_AGENT,
+              'Accept': 'application/json',
+            },
+          });
 
-        return res;
-      },
-      { maxAttempts: 3, initialDelayMs: 1000 }
-    );
+          if (!res.ok) {
+            throw new Error(`DexScreener boosts API returned ${res.status}`);
+          }
 
-    const data = (await response.json()) as DexScreenerTokenBoost[];
+          return res;
+        },
+        { maxAttempts: 3, initialDelayMs: 1000 }
+      );
 
-    if (!Array.isArray(data)) {
-      return [];
+      const data = (await response.json()) as DexScreenerTokenBoost[];
+
+      if (!Array.isArray(data)) {
+        return [];
+      }
+
+      // Filter for Solana tokens only
+      const solanaBoosts = data.filter(
+        (boost) => boost.chainId === 'solana'
+      );
+
+      return solanaBoosts.slice(0, limit);
+    };
+
+    // Use cache
+    const { data, cached } = await boostsCache.getOrFetch(cacheKey, fetcher);
+
+    if (cached) {
+      logger.debug({ cached: true, count: data.length }, 'Returning cached top boosts');
     }
 
-    // Filter for Solana tokens only
-    const solanaBoosts = data.filter(
-      (boost) => boost.chainId === 'solana'
-    );
-
-    return solanaBoosts.slice(0, limit);
+    return data;
   } catch (error) {
     logger.error({ error }, 'Failed to fetch top boosted tokens');
     return [];
