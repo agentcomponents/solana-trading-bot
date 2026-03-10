@@ -156,13 +156,13 @@ const EnvSchema = z
       .describe('Trailing stop percentage'),
 
     /**
-     * Trailing stop activation threshold (e.g., 100 = +100%)
+     * Trailing stop activation threshold (e.g., 5 = +5%)
      */
     TRAILING_STOP_ACTIVATION_PERCENTAGE: z
       .string()
-      .default('100')
+      .default('5')
       .transform((val) => Number(val))
-      .pipe(z.number().min(50).max(200))
+      .pipe(z.number().min(1).max(200))
       .describe('Trailing stop activation percentage'),
 
     /**

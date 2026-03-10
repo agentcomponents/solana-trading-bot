@@ -1,34 +1,41 @@
 /**
  * Exit Strategy Configuration
  *
- * User-confirmed exit thresholds and parameters.
- * Reference: design/04-monitoring-exit.md
+ * Memecoin-optimized exit thresholds.
+ * Reads from environment variables with sensible defaults.
  */
+
+// Read from environment with defaults (negate stop loss for loss)
+const STOP_LOSS = -(Number(process.env.STOP_LOSS_PERCENTAGE) || 15);
+const TRAILING_STOP = Number(process.env.TRAILING_STOP_PERCENTAGE) || 10;
+const TRAILING_ACTIVATION = Number(process.env.TRAILING_STOP_ACTIVATION_PERCENTAGE) || 5;
+const MAX_HOLD_HOURS = Number(process.env.MAX_HOLD_TIME_HOURS) || 4;
 
 /**
  * Exit strategy configuration
  *
- * These values are based on user-approved exit strategy:
- * - Stop Loss: -40% from entry
- * - Take Profit 1: +50% (sell 25%)
- * - Take Profit 2: +100% (sell 25%, activate trailing)
- * - Trailing Stop: 15% below peak
+ * Memecoin-optimized strategy:
+ * - Stop Loss: -15% (tight, catch dumps early)
+ * - Take Profit 1: +10% (lock in gains early)
+ * - Take Profit 2: +25% (catch bigger pumps, activate trailing)
+ * - Trailing Stop: 10% below peak (after TP2)
  * - Max Hold Time: 4 hours
  */
 export const EXIT_CONFIG = {
   // Exit condition thresholds (percentages)
-  STOP_LOSS_PERCENT: -40,
-  TAKE_PROFIT_1_PERCENT: 50,
-  TAKE_PROFIT_2_PERCENT: 100,
-  TRAILING_STOP_PERCENT: 15, // Below peak
+  STOP_LOSS_PERCENT: STOP_LOSS,
+  TAKE_PROFIT_1_PERCENT: 10,  // Lock in 10% gains
+  TAKE_PROFIT_2_PERCENT: 25,  // Lock in 25% gains, activate trailing
+  TRAILING_STOP_PERCENT: TRAILING_STOP,
+  TRAILING_ACTIVATION_PERCENT: TRAILING_ACTIVATION,
 
   // Position sizes for partial exits (percent of remaining position)
   TAKE_PROFIT_1_SELL_PERCENT: 25,
   TAKE_PROFIT_2_SELL_PERCENT: 25,
-  STOP_LOSS_SELL_PERCENT: 50,
+  STOP_LOSS_SELL_PERCENT: 100,  // Full exit on stop loss (memecoins dump fast)
 
   // Time limits
-  MAX_HOLD_TIME_MS: 4 * 60 * 60 * 1000, // 4 hours in milliseconds
+  MAX_HOLD_TIME_MS: MAX_HOLD_HOURS * 60 * 60 * 1000,
 
   // Price monitoring
   PRICE_POLL_INTERVAL_MS: 2000, // Poll every 2 seconds
