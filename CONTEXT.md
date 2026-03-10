@@ -16,7 +16,7 @@ Build a Solana crypto trading bot that:
 
 ---
 
-## Current Status: Phase 4 Complete ✅ | Next: Main Bot Orchestrator
+## Current Status: Phase 5 Complete ✅ | Ready for Testing
 
 ### 🎯 Quick Reference
 
@@ -25,34 +25,41 @@ Build a Solana crypto trading bot that:
 | Phase 1: Project Foundation | ✅ Complete | 93 tests |
 | Phase 2: Database + APIs | ✅ Complete | 225+ tests |
 | Phase 3: Trading Engine | ✅ Complete | 298+ tests |
-| **Phase 4: Paper Trading** | ✅ **Complete** | **31 tests** |
-| Phase 5: Main Bot | ⏳ **NEXT** | - |
+| Phase 4: Paper Trading | ✅ Complete | 31 tests |
+| **Phase 5: Main Bot** | ✅ **Complete** | **15 tests** |
 
-**Total: 349 tests passing ✅**
+**Total: 364 tests passing ✅**
 
 ---
 
-## Latest Session (2026-03-10) - Phase 4 Complete
+## Latest Session (2026-03-10) - Phase 5 Complete
 
-### ✅ Phase 4: Paper Trading Engine (COMPLETED THIS SESSION)
+### ✅ Phase 5: Main Bot Orchestrator (COMPLETED THIS SESSION)
 
 **What Was Built:**
-- **Slippage Simulator** (`src/paper/slippage.ts`) - Realistic slippage (5-500 bps)
-- **Virtual Wallet** (`src/paper/wallet.ts`) - Track holdings without real funds
-- **Paper Trading Engine** (`src/paper/engine.ts`) - Main orchestrator
-- **Performance Analytics** (`src/paper/analytics.ts`) - Metrics & readiness check
+- **Bot Config** (`src/bot/config.ts`) - Trading mode, parameters, defaults
+- **Bot Orchestrator** (`src/bot/orchestrator.ts`) - Main trading loop: scan → validate → entry → monitor → exit
+- **CLI Commands** (`src/cli/commands.ts`) - Commands: start:paper, start:live, report, status
+- **Main Entry** (`src/index.ts`) - Application bootstrap with error handling
 
 **Test Results:**
 ```
-✅ 349 tests passing (21 test files)
-✅ 31 new paper trading unit tests
+✅ 364 tests passing (22 test files)
+✅ 15 new bot unit tests
 ✅ Clean TypeScript build
+```
+
+**New NPM Scripts:**
+```bash
+npm run start:paper  # Run paper trading mode
+npm run start:live   # Run live trading mode
+npm run report       # Generate performance report
+npm run status       # Show current positions
 ```
 
 **Git Commit:**
 ```
-b6e2b9a feat: implement Phase 4 Paper Trading Engine
-12 files changed, 2147 insertions(+), 120 deletions(-)
+[To be committed] feat: implement Phase 5 Main Bot Orchestrator
 ```
 
 ---
@@ -106,6 +113,15 @@ b6e2b9a feat: implement Phase 4 Paper Trading Engine
 | Paper Trading Engine | ✅ Complete | - |
 | Performance Analytics | ✅ Complete | - |
 
+### ✅ Phase 5: Main Bot Orchestrator
+
+| Component | Status | Tests |
+|-----------|--------|-------|
+| Bot Config | ✅ Complete | 10 tests |
+| Bot Orchestrator | ✅ Complete | 5 tests |
+| CLI Commands | ✅ Complete | - |
+| Main Entry Point | ✅ Complete | - |
+
 ---
 
 ## Live Trading Readiness Criteria
@@ -142,11 +158,16 @@ Picker/
 │   ├── safety/                  # RugCheck + GoPlus safety
 │   ├── entry/                   # Entry logic
 │   ├── exit/                    # Exit logic
-│   └── paper/                   # ✅ NEW - Paper trading
+│   ├── paper/                   # Paper trading
+│   ├── bot/                     # ✅ NEW - Main bot orchestrator
+│   ├── cli/                     # ✅ NEW - CLI commands
+│   └── index.ts                 # ✅ NEW - Main entry point
 ├── tests/
-│   ├── unit/                    # Unit tests (349 total)
+│   ├── unit/                    # Unit tests (364 total)
+│   │   ├── bot/                 # ✅ NEW - Bot tests
+│   │   └── paper/               # Paper trading tests
 │   ├── integration/             # API integration tests
-│   └── manual/                  # ✅ NEW - Demo scripts
+│   └── manual/                  # Demo scripts
 └── data/                        # SQLite database
 ```
 
@@ -207,46 +228,51 @@ Clamp: 5 bps to 500 bps
 
 ---
 
-## Next Session: Phase 5 - Main Bot Orchestrator
+## Next Session: Paper Trading Validation
 
-### What's Missing
+### What's Next
 
-We have all the **modules** but no **main bot** that ties them together:
+The bot is now **fully implemented**! The next step is to **run paper trading** to validate the strategy:
 
 ```
-Missing components:
-├── bot/           ❌ Main orchestrator
-├── cli/           ❌ Command-line interface
-└── index.ts       ❌ Main entry point
+Ready to test:
+├── npm run start:paper  ✅ Run paper trading bot
+├── npm run report       ✅ Generate performance report
+└── npm run status       ✅ Check current positions
 ```
 
-### What Needs to Be Built
+### Validation Criteria
 
-1. **Main Bot Orchestrator** (`src/bot/orchestrator.ts`)
-   - Scan tokens from DexScreener
-   - Validate safety (RugCheck + GoPlus)
-   - Execute entries (paper or live mode)
-   - Monitor positions with exit logic
-   - Run continuously
+Before switching to live trading:
 
-2. **CLI Interface** (`src/cli/index.ts`)
-   - `npm run start:paper` - Paper trading mode
-   - `npm run start:live` - Live trading mode
-   - `npm run report` - Performance report
-   - `npm run status` - Current positions
+| Criterion | Threshold | Current |
+|-----------|-----------|---------|
+| Minimum Paper Trades | ≥ 20 | ⏳ Need to run |
+| Win Rate | ≥ 40% | ⏳ TBD |
+| Max Drawdown | < 30% | ⏳ TBD |
+| Positive P&L | Yes | ⏳ TBD |
 
-3. **Configuration** (`src/bot/config.ts`)
-   - Trading mode (paper/live)
-   - Initial SOL amount
-   - Entry/exit parameters
+### Steps to Start Paper Trading
 
-### Implementation Order
+1. **Run the bot** (it will scan and trade automatically):
+   ```bash
+   npm run start:paper
+   ```
 
-1. **Bot Config** - Trading mode, parameters
-2. **Bot Orchestrator** - Main loop: scan → validate → entry → monitor → exit
-3. **CLI** - Command interface
-4. **Main Entry** - `src/index.ts`
-5. **Paper Trading Run** - Execute 20+ trades to validate strategy
+2. **Monitor progress** in another terminal:
+   ```bash
+   npm run status
+   ```
+
+3. **Generate report** after 20+ trades:
+   ```bash
+   npm run report
+   ```
+
+4. **Review results** and validate:
+   - Win rate ≥ 40%
+   - Max drawdown < 30%
+   - Positive P&L
 
 ---
 
@@ -266,10 +292,16 @@ git log --oneline -5
 # Run verification
 npm run build      # TypeScript compilation
 npm run lint       # ESLint check
-npm test -- --run  # Run all 349 tests
+npm test -- --run  # Run all 364 tests
 
-# Run paper trading demo
-npx tsx tests/manual/demo-paper-trading.ts
+# Start paper trading bot
+npm run start:paper
+
+# Check status (in another terminal)
+npm run status
+
+# Generate report
+npm run report
 ```
 
 ---
@@ -287,13 +319,14 @@ npx tsx tests/manual/demo-paper-trading.ts
 - Schema version: 1
 
 ### Testing
-- Total: 349 tests
+- Total: 364 tests
 - Framework: Vitest
 - Coverage: 80%+ target achieved
 
 ### Git History (Recent)
 ```
-b6e2b9a feat: implement Phase 4 Paper Trading Engine (THIS SESSION)
+[To be committed] feat: implement Phase 5 Main Bot Orchestrator
+b6e2b9a feat: implement Phase 4 Paper Trading Engine
 5a656b9 docs: prepare session handoff - Phase 3 complete
 612d6e8 docs: update CONTEXT.md for Phase 3 Trading Engine completion
 319cdbc feat: implement Phase 3 Exit Logic
@@ -316,5 +349,5 @@ b6e2b9a feat: implement Phase 4 Paper Trading Engine (THIS SESSION)
 ---
 
 *Last Updated: 2026-03-10*
-*Session: Phase 4 Paper Trading Implementation Complete*
-*Next: Main Bot Orchestrator (Phase 5)*
+*Session: Phase 5 Main Bot Orchestrator Complete*
+*Next: Paper Trading Validation*

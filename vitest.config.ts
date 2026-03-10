@@ -1,10 +1,16 @@
 import { defineConfig } from 'vitest/config';
 import { loadEnv } from 'vite';
+import path from 'node:path';
 
 // Load environment variables from .env
 loadEnv('', process.cwd());
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   test: {
     globals: true,
     environment: 'node',
