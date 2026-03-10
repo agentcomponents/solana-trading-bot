@@ -14,3 +14,22 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  alerter:
+    build: ./alerter
+    container_name: picker-alerter
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=8107421448:AAFPT3zScNkqhTndxFI9leLmG-9hqcTt8SA
+      - TELEGRAM_CHAT_ID=7773443332
+      - DATABASE_PATH=/app/data/trading-bot.db
+      - POLL_INTERVAL_MS=30000
+    volumes:
+      - ./data:/app/data:ro
+    depends_on:
+      - picker
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
