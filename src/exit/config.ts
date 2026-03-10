@@ -25,7 +25,7 @@ export const EXIT_CONFIG = {
   // Exit condition thresholds (percentages)
   STOP_LOSS_PERCENT: -STOP_LOSS_PCT,  // Negative = loss
   TAKE_PROFIT_1_PERCENT: 10,           // Lock in 10% gains
-  TAKE_PROFIT_2_PERCENT: 25,           // Lock in 25% gains, activate trailing
+  TAKE_PROFIT_2_PERCENT: TRAILING_ACTIVATION_PCT, // Activate trailing at this gain
   TRAILING_STOP_PERCENT: TRAILING_STOP_PCT,
 
   // Position sizes for partial exits (percent of remaining position)
