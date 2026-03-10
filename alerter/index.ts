@@ -39,13 +39,22 @@ const EMOJI = {
 };
 
 /**
- * Format price (handle scientific notation)
+ * Format price (show full decimal, not scientific notation)
  */
 function formatPrice(price: number): string {
+  if (price === 0) return '0';
+  
+  // For very small numbers, show up to 15 decimal places
   if (price < 0.00000001) {
-    return price.toExponential(4);
+    return price.toFixed(15).replace(/\.?0+$/, '');
   }
-  return price.toFixed(12);
+  if (price < 0.000001) {
+    return price.toFixed(12).replace(/\.?0+$/, '');
+  }
+  if (price < 0.001) {
+    return price.toFixed(9).replace(/\.?0+$/, '');
+  }
+  return price.toFixed(6).replace(/\.?0+$/, '');
 }
 
 /**
