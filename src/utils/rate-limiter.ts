@@ -55,6 +55,33 @@ export class RateLimiter {
 }
 
 /**
+ * DexScreener Rate Limiter
+ * 
+ * Two tiers based on DexScreener API limits:
+ * - Fast tier: 300 requests/minute (5 req/sec) for /latest/dex/* and /tokens/*
+ * - Slow tier: 30 requests/minute (0.5 req/sec) for /token-boosts/*
+ */
+class DexScreenerLimiter {
+  private fastLimiter: RateLimiter;
+  private slowLimiter: RateLimiter;
+
+  constructor() {
+    this.fastLimiter = new RateLimiter(5, 10);  // 5 req/sec, burst 10
+    this.slowLimiter = new RateLimiter(0.5, 2); // 0.5 req/sec, burst 2
+  }
+
+  async waitForFast(): Promise<void> {
+    await this.fastLimiter.waitForToken();
+  }
+
+  async waitForSlow(): Promise<void> {
+    await this.slowLimiter.waitForToken();
+  }
+}
+
+export const dexScreenerLimiter = new DexScreenerLimiter();
+
+/**
  * Simple in-memory cache with TTL
  */
 export class Cache<T> {
@@ -98,6 +125,20 @@ export class Cache<T> {
 
   size(): number {
     return this.store.size;
+  }
+
+  /**
+   * Get or fetch with cache
+   */
+  async getOrFetch(key: string, fetcher: () => Promise<T>): Promise<{ data: T; cached: boolean }> {
+    const cached = this.get(key);
+    if (cached !== undefined) {
+      return { data: cached, cached: true };
+    }
+
+    const data = await fetcher();
+    this.set(key, data);
+    return { data, cached: false };
   }
 }
 

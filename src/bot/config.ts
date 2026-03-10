@@ -111,10 +111,11 @@ export function loadBotConfig(): TradingBotConfig {
     minLiquidityUsd: envConfig.MIN_LIQUIDITY_USD,
     maxLiquidityUsd: 500000, // Default max
     minPoolSolAmount: envConfig.MIN_POOL_SOL_AMOUNT,
-    takeProfit1Percent: 50, // +50% trigger
-    takeProfit2Percent: 100, // +100% trigger
-    takeProfit1SellPercent: 25, // Sell 25% at TP1
-    takeProfit2SellPercent: 25, // Sell 25% at TP2
+    // Take profit - matches exit/config.ts
+    takeProfit1Percent: 10, // +10% trigger (sell 50%)
+    takeProfit2Percent: envConfig.TRAILING_STOP_ACTIVATION_PERCENTAGE, // Same as trailing activation
+    takeProfit1SellPercent: 50, // Sell 50% at TP1
+    takeProfit2SellPercent: 0, // Disabled - trailing activates after TP1
     databasePath: envConfig.DATABASE_PATH,
     logLevel: envConfig.LOG_LEVEL,
   };

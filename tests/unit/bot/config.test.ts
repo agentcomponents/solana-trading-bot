@@ -92,16 +92,16 @@ describe('bot/config', () => {
     it('should include risk management settings', () => {
       const config = loadBotConfig();
 
-      expect(config.stopLossPercentage).toBe(40);
-      expect(config.trailingStopPercentage).toBe(15);
-      expect(config.trailingStopActivationPercentage).toBe(100);
+      expect(config.stopLossPercentage).toBe(10);
+      expect(config.trailingStopPercentage).toBe(7);
+      expect(config.trailingStopActivationPercentage).toBe(10);
       expect(config.maxHoldTimeHours).toBe(4);
     });
 
     it('should include liquidity filters', () => {
       const config = loadBotConfig();
 
-      expect(config.minLiquidityUsd).toBe(15000);
+      expect(config.minLiquidityUsd).toBe(8000);
       expect(config.maxLiquidityUsd).toBe(500000);
       expect(config.minPoolSolAmount).toBe(50);
     });
@@ -109,10 +109,11 @@ describe('bot/config', () => {
     it('should include take profit levels', () => {
       const config = loadBotConfig();
 
-      expect(config.takeProfit1Percent).toBe(50);
-      expect(config.takeProfit2Percent).toBe(100);
-      expect(config.takeProfit1SellPercent).toBe(25);
-      expect(config.takeProfit2SellPercent).toBe(25);
+      // These read from .env which has the new values
+      expect(config.takeProfit1Percent).toBe(10);
+      expect(config.takeProfit2Percent).toBe(10);
+      expect(config.takeProfit1SellPercent).toBe(50);
+      expect(config.takeProfit2SellPercent).toBe(0);
     });
 
     it('should cache config on subsequent calls', () => {

@@ -159,12 +159,14 @@ describe('Scanner Module', () => {
 
   describe('DEFAULT_SCAN_CRITERIA', () => {
     it('should have correct default values', () => {
-      expect(DEFAULT_SCAN_CRITERIA.minLiquidityUsd).toBe(15000);
+      expect(DEFAULT_SCAN_CRITERIA.minLiquidityUsd).toBe(8000);
       expect(DEFAULT_SCAN_CRITERIA.maxLiquidityUsd).toBe(5000000);
-      expect(DEFAULT_SCAN_CRITERIA.minVolume24h).toBe(5000);
-      expect(DEFAULT_SCAN_CRITERIA.minPriceChange1h).toBe(5);
-      expect(DEFAULT_SCAN_CRITERIA.maxPairAgeHours).toBe(24);
-      expect(DEFAULT_SCAN_CRITERIA.minPairAgeHours).toBe(0.5);
+      expect(DEFAULT_SCAN_CRITERIA.minVolume24h).toBe(10000);
+      expect(DEFAULT_SCAN_CRITERIA.minTxnsH1).toBe(5);
+      expect(DEFAULT_SCAN_CRITERIA.minPriceChange1h).toBe(-5); // Allow dips
+      expect(DEFAULT_SCAN_CRITERIA.maxPairAgeHours).toBe(72); // 3 days
+      expect(DEFAULT_SCAN_CRITERIA.minPairAgeHours).toBe(0.25); // 15 min
+      expect(DEFAULT_SCAN_CRITERIA.minScore).toBe(50);
 
       console.log('✅ Default Scan Criteria:');
       console.log(`  Min Liquidity: $${DEFAULT_SCAN_CRITERIA.minLiquidityUsd?.toLocaleString()}`);

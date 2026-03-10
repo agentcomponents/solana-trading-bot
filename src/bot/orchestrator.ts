@@ -291,17 +291,24 @@ export class TradingBot {
         return;
       }
 
-      // Safety check all tokens
+      // Safety check all tokens (with error handling)
       const safetyResults = new Map<string, any>();
       for (const token of scannedTokens) {
-        const safety = await checkTokenSafetyAggregate(token.address);
-        safetyResults.set(token.address, safety);
+        try {
+          const safety = await checkTokenSafetyAggregate(token.address);
+          safetyResults.set(token.address, safety);
+        } catch (error) {
+          // On error, mark as unsafe but continue
+          logger.warn({ token: token.symbol, error }, 'Safety check failed, skipping token');
+          safetyResults.set(token.address, { safe: false, confidence: 'low', reasons: ['Safety check failed'] });
+        }
       }
 
-      // Validate entries
+      // Validate entries (safety check optional - rely on scoring)
       const signals = await validateMultipleEntries(
         scannedTokens as any,
-        safetyResults
+        safetyResults,
+        { requireSafetyCheck: false }  // Trust scoring, don't require safety check
       );
 
       logger.debug({ validated: signals.length }, 'Validation complete');

@@ -140,27 +140,27 @@ const EnvSchema = z
      */
     STOP_LOSS_PERCENTAGE: z
       .string()
-      .default('40')
+      .default('10')
       .transform((val) => Number(val))
       .pipe(z.number().min(1).max(100))
       .describe('Stop loss percentage'),
 
     /**
-     * Trailing stop distance from peak (e.g., 15 = 15%)
+     * Trailing stop distance from peak (e.g., 7 = 7%)
      */
     TRAILING_STOP_PERCENTAGE: z
       .string()
-      .default('15')
+      .default('7')
       .transform((val) => Number(val))
       .pipe(z.number().min(1).max(50))
       .describe('Trailing stop percentage'),
 
     /**
-     * Trailing stop activation threshold (e.g., 5 = +5%)
+     * Trailing stop activation threshold (e.g., 10 = +10%)
      */
     TRAILING_STOP_ACTIVATION_PERCENTAGE: z
       .string()
-      .default('5')
+      .default('10')
       .transform((val) => Number(val))
       .pipe(z.number().min(1).max(200))
       .describe('Trailing stop activation percentage'),
