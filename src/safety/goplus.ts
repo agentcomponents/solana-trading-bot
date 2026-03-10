@@ -6,6 +6,7 @@
  */
 
 import { logger } from '../utils/logger';
+import { RateLimiter, Cache, retryWithBackoff } from '../utils/rate-limiter';
 
 // ============================================================================
 // CONFIG
@@ -13,6 +14,12 @@ import { logger } from '../utils/logger';
 
 const BASE_URL = 'https://api.gopluslabs.io/api/v1';
 const API_KEY = process.env['GOPLUS_API_KEY'] ?? '';
+
+// Rate limiter: 1 request per second to avoid 429 errors
+const rateLimiter = new RateLimiter(1, 2);
+
+// Cache: 5 minute TTL for safety results
+const cache = new Cache<GoPlusTokenSecurity | null>(5 * 60 * 1000);
 
 // ============================================================================
 // TYPES
@@ -167,33 +174,78 @@ export async function checkTokenSecurity(
 
   logger.debug({ tokenAddresses: addresses }, 'Checking GoPlus token security');
 
+  // Check cache for each address
+  const results: Record<string, GoPlusTokenSecurity> = {};
+  const uncached: string[] = [];
+
+  for (const addr of addresses) {
+    const cached = cache.get(addr);
+    if (cached !== undefined && cached !== null) {
+      results[addr] = cached;
+    } else {
+      uncached.push(addr);
+    }
+  }
+
+  if (uncached.length === 0) {
+    logger.debug({ cached: addresses.length }, 'All GoPlus results from cache');
+    return results;
+  }
+
+  // Wait for rate limiter
+  await rateLimiter.waitForToken();
+
   try {
     const accessToken = getAccessToken();
     const params = new URLSearchParams({
-      contract_addresses: addresses.join(','),
+      contract_addresses: uncached.join(','),
       access_token: accessToken
     });
 
-    const response = await fetch(`${BASE_URL}/solana/token_security?${params.toString()}`);
+    const data = await retryWithBackoff(
+      async () => {
+        const response = await fetch(`${BASE_URL}/solana/token_security?${params.toString()}`);
 
-    if (!response.ok) {
-      throw new Error(`GoPlus API error: ${response.status} ${response.statusText}`);
+        if (response.status === 429) {
+          throw new Error('Rate limited (429)');
+        }
+
+        if (!response.ok) {
+          throw new Error(`GoPlus API error: ${response.status} ${response.statusText}`);
+        }
+
+        const respData = (await response.json()) as GoPlusTokenSecurityResponse;
+
+        if (respData.code !== 1) {
+          logger.warn({ code: respData.code, message: respData.message }, 'GoPlus API returned non-success code');
+        }
+
+        return respData;
+      },
+      { maxRetries: 3, initialDelayMs: 2000 }
+    );
+
+    const converted = convertToTokenSecurity(data.result ?? {});
+
+    // Cache results
+    for (const [addr, security] of Object.entries(converted)) {
+      cache.set(addr, security);
+      results[addr] = security;
     }
 
-    const data = (await response.json()) as GoPlusTokenSecurityResponse;
-
-    if (data.code !== 1) {
-      logger.warn({ code: data.code, message: data.message }, 'GoPlus API returned non-success code');
-      // Still return result if available
-      return convertToTokenSecurity(data.result ?? {});
+    // Cache null for addresses with no results
+    for (const addr of uncached) {
+      if (!converted[addr]) {
+        cache.set(addr, null);
+      }
     }
 
     logger.debug(
-      { checked: addresses.length, results: Object.keys(data.result ?? {}).length },
+      { checked: uncached.length, results: Object.keys(converted).length },
       'GoPlus token security check complete'
     );
 
-    return convertToTokenSecurity(data.result ?? {});
+    return results;
   } catch (error) {
     logger.error({ error }, 'GoPlus token security check failed');
     throw error;

@@ -8,6 +8,7 @@
 
 import { logger } from '../utils/logger';
 import { RugCheckReportSchema } from '../types';
+import { RateLimiter, Cache, retryWithBackoff } from '../utils/rate-limiter';
 import { z } from 'zod';
 
 // ============================================================================
@@ -15,6 +16,12 @@ import { z } from 'zod';
 // ============================================================================
 
 const BASE_URL = 'https://api.rugcheck.xyz';
+
+// Rate limiter: 1 request per second to avoid 429 errors
+const rateLimiter = new RateLimiter(1, 2);
+
+// Cache: 5 minute TTL for safety results
+const cache = new Cache<RugCheckTokenSecurity | null>(5 * 60 * 1000);
 
 // ============================================================================
 // TYPES
@@ -147,36 +154,64 @@ export interface TokenSecurityCheck {
 export async function checkTokenSecurity(tokenAddress: string): Promise<RugCheckTokenSecurity | null> {
   logger.debug({ tokenAddress }, 'Checking RugCheck token security');
 
+  // Check cache first
+  const cached = cache.get(tokenAddress);
+  if (cached !== undefined) {
+    logger.debug({ tokenAddress, cached: true }, 'Using cached RugCheck result');
+    return cached;
+  }
+
+  // Wait for rate limiter
+  await rateLimiter.waitForToken();
+
   try {
-    const response = await fetch(`${BASE_URL}/v1/tokens/${tokenAddress}/report`);
+    const result = await retryWithBackoff(
+      async () => {
+        const response = await fetch(`${BASE_URL}/v1/tokens/${tokenAddress}/report`);
 
-    if (!response.ok) {
-      logger.warn({ status: response.status }, 'RugCheck API returned non-success status');
+        if (response.status === 429) {
+          throw new Error('Rate limited (429)');
+        }
+
+        if (!response.ok) {
+          logger.warn({ status: response.status }, 'RugCheck API returned non-success status');
+          return null;
+        }
+
+        const rawData = await response.json();
+
+        // SECURITY: Validate API response structure before using
+        const validationResult = RugCheckReportSchema.safeParse(rawData);
+        if (!validationResult.success) {
+          logger.warn(
+            { tokenAddress, errors: validationResult.error.flatten() },
+            'RugCheck API response validation failed'
+          );
+          return null;
+        }
+
+        return validationResult.data;
+      },
+      { maxRetries: 3, initialDelayMs: 2000 }
+    );
+
+    if (!result) {
+      cache.set(tokenAddress, null);
       return null;
     }
 
-    const rawData = await response.json();
-
-    // SECURITY: Validate API response structure before using
-    const validationResult = RugCheckReportSchema.safeParse(rawData);
-    if (!validationResult.success) {
-      logger.warn(
-        { tokenAddress, errors: validationResult.error.flatten() },
-        'RugCheck API response validation failed'
-      );
-      return null;
-    }
-
-    const data = validationResult.data;
-
+    const security = convertToTokenSecurity(result);
+    cache.set(tokenAddress, security);
+    
     logger.debug(
-      { score: data.score, normalizedScore: data.score_normalised, risks: data.risks?.length },
+      { score: result.score, normalizedScore: result.score_normalised, risks: result.risks?.length },
       'RugCheck token security check complete'
     );
 
-    return convertToTokenSecurity(data);
+    return security;
   } catch (error) {
     logger.error({ error, tokenAddress }, 'RugCheck token security check failed');
+    cache.set(tokenAddress, null);
     return null;
   }
 }

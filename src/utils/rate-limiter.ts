@@ -1,130 +1,147 @@
 /**
- * Sliding Window Rate Limiter
+ * Rate Limiter Utility
  *
- * Tracks API requests within a sliding time window to enforce rate limits.
+ * Simple token bucket rate limiter for API calls.
  */
 
-export interface RateLimiterConfig {
-  /** Requests per minute allowed */
-  requestsPerMinute: number;
-  /** Window size in milliseconds (default: 60000 = 1 minute) */
-  windowMs?: number;
-}
-
 export class RateLimiter {
-  private requests: number[] = [];
-  private readonly requestsPerMinute: number;
-  private readonly windowMs: number;
+  private tokens: number;
+  private lastRefill: number;
+  private readonly maxTokens: number;
+  private readonly refillMs: number;
 
-  constructor(config: RateLimiterConfig) {
-    this.requestsPerMinute = config.requestsPerMinute;
-    this.windowMs = config.windowMs ?? 60000;
+  /**
+   * Create a rate limiter
+   * @param requestsPerSecond Maximum requests per second
+   * @param burstSize Maximum burst size (default: same as requestsPerSecond)
+   */
+  constructor(requestsPerSecond: number, burstSize?: number) {
+    this.maxTokens = burstSize ?? requestsPerSecond;
+    this.tokens = this.maxTokens;
+    this.refillMs = 1000 / requestsPerSecond;
+    this.lastRefill = Date.now();
   }
 
   /**
-   * Check if a request would exceed the rate limit
-   * @returns true if request is allowed, false if rate limited
+   * Wait until a token is available
+   * @returns Promise that resolves when a token is acquired
    */
-  async acquire(): Promise<boolean> {
-    const now = Date.now();
-
-    // Remove requests outside the current window
-    this.requests = this.requests.filter(
-      (timestamp) => now - timestamp < this.windowMs
-    );
-
-    // Check if we can make a request
-    if (this.requests.length < this.requestsPerMinute) {
-      this.requests.push(now);
-      return true;
+  async waitForToken(): Promise<void> {
+    this.refill();
+    
+    if (this.tokens >= 1) {
+      this.tokens--;
+      return;
     }
 
-    return false;
+    // Calculate wait time
+    const waitMs = this.refillMs;
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+    
+    return this.waitForToken();
   }
 
   /**
-   * Wait until a request slot is available
-   * @returns true when request is allowed
+   * Refill tokens based on elapsed time
    */
-  async waitForSlot(): Promise<void> {
-    while (!(await this.acquire())) {
-      // Calculate wait time until oldest request expires
-      const oldestRequest = this.requests[0];
-      const waitTime = oldestRequest + this.windowMs - Date.now() + 100;
-
-      if (waitTime > 0) {
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-      }
-    }
-  }
-
-  /**
-   * Get current usage statistics
-   */
-  getStats(): { used: number; limit: number; remaining: number } {
+  private refill(): void {
     const now = Date.now();
-    this.requests = this.requests.filter(
-      (timestamp) => now - timestamp < this.windowMs
-    );
-
-    return {
-      used: this.requests.length,
-      limit: this.requestsPerMinute,
-      remaining: this.requestsPerMinute - this.requests.length,
-    };
-  }
-
-  /**
-   * Reset the rate limiter (for testing)
-   */
-  reset(): void {
-    this.requests = [];
+    const elapsed = now - this.lastRefill;
+    const tokensToAdd = elapsed / this.refillMs;
+    
+    this.tokens = Math.min(this.maxTokens, this.tokens + tokensToAdd);
+    this.lastRefill = now;
   }
 }
 
 /**
- * Two-tier rate limiter for DexScreener API
- *
- * Using CONSERVATIVE limits (50% of documented) to avoid 429s:
- * - Slow tier: 30 req/min (documented: 60) for boosts, profiles
- * - Fast tier: 150 req/min (documented: 300) for search, pairs, tokens
+ * Simple in-memory cache with TTL
  */
-export class DexScreenerRateLimiter {
-  readonly slow: RateLimiter;
-  readonly fast: RateLimiter;
+export class Cache<T> {
+  private store = new Map<string, { value: T; expiresAt: number }>();
+  private readonly ttlMs: number;
 
-  constructor() {
-    this.slow = new RateLimiter({ requestsPerMinute: 30 });
-    this.fast = new RateLimiter({ requestsPerMinute: 150 });
+  constructor(ttlMs: number) {
+    this.ttlMs = ttlMs;
   }
 
-  /**
-   * Wait for a slow-tier slot (boosts, profiles)
-   */
-  async waitForSlow(): Promise<void> {
-    await this.slow.waitForSlot();
+  get(key: string): T | undefined {
+    const entry = this.store.get(key);
+    if (!entry) return undefined;
+    
+    if (Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      return undefined;
+    }
+    
+    return entry.value;
   }
 
-  /**
-   * Wait for a fast-tier slot (search, pairs, tokens)
-   */
-  async waitForFast(): Promise<void> {
-    await this.fast.waitForSlot();
+  set(key: string, value: T): void {
+    this.store.set(key, {
+      value,
+      expiresAt: Date.now() + this.ttlMs,
+    });
   }
 
-  /**
-   * Get stats for both tiers
-   */
-  getStats(): {
-    slow: ReturnType<RateLimiter['getStats']>;
-    fast: ReturnType<RateLimiter['getStats']>;
-  } {
-    return {
-      slow: this.slow.getStats(),
-      fast: this.fast.getStats(),
-    };
+  has(key: string): boolean {
+    return this.get(key) !== undefined;
+  }
+
+  delete(key: string): boolean {
+    return this.store.delete(key);
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
+
+  size(): number {
+    return this.store.size;
   }
 }
 
-// Singleton instance
-export const dexScreenerLimiter = new DexScreenerRateLimiter();
+/**
+ * Retry with exponential backoff
+ */
+export async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    initialDelayMs?: number;
+    maxDelayMs?: number;
+    backoffFactor?: number;
+    shouldRetry?: (error: Error) => boolean;
+  } = {}
+): Promise<T> {
+  const {
+    maxRetries = 3,
+    initialDelayMs = 1000,
+    maxDelayMs = 10000,
+    backoffFactor = 2,
+    shouldRetry = (error) => {
+      const msg = error.message.toLowerCase();
+      return msg.includes('429') || msg.includes('rate') || msg.includes('limit');
+    },
+  } = options;
+
+  let lastError: Error | undefined;
+  let delayMs = initialDelayMs;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      if (attempt === maxRetries || !shouldRetry(lastError)) {
+        throw lastError;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      delayMs = Math.min(delayMs * backoffFactor, maxDelayMs);
+    }
+  }
+
+  throw lastError;
+}
