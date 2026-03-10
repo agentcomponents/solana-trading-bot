@@ -2,19 +2,29 @@
  * DexScreener API Client
  *
  * Fetches token data from DexScreener for finding opportunities.
- * Documentation: https://docs.dexscreener.com/api/v2
+ * Documentation: https://docs.dexscreener.com/api/reference
+ *
+ * Rate Limits (per official docs):
+ * - Slow tier (60 req/min): token-boosts, token-profiles, community-takeovers, ads
+ * - Fast tier (300 req/min): dex/search, dex/pairs, token-pairs, tokens (batch)
  */
 
 import { logger } from '../utils/logger';
 import { retry } from '../utils/retry';
+import { dexScreenerLimiter } from '../utils/rate-limiter';
 
 // ============================================================================
 // CONFIG
 // ============================================================================
 
-const BASE_URL = 'https://api.dexscreener.com/latest';
-const BOOSTS_BASE_URL = 'https://api.dexscreener.com';
+const API_BASE = 'https://api.dexscreener.com';
 const USER_AGENT = 'SolanaTradingBot/1.0';
+
+// Rate limit tiers (per DexScreener API docs)
+const RATE_LIMITS = {
+  slow: 60, // boosts, profiles, community-takeovers
+  fast: 300, // search, pairs, tokens (batch)
+} as const;
 
 // ============================================================================
 // TYPES
@@ -139,6 +149,7 @@ export interface TokenSearchResult {
 
 /**
  * Get token info from DexScreener by token address
+ * Uses /token-pairs/v1/{chainId}/{tokenAddress} endpoint (fast tier)
  */
 export async function getTokenInfo(
   tokenAddress: string
@@ -146,10 +157,12 @@ export async function getTokenInfo(
   logger.debug({ tokenAddress }, 'Fetching token info from DexScreener');
 
   try {
+    await dexScreenerLimiter.waitForFast();
+
     const response = await retry(
       async () => {
         const res = await fetch(
-          `${BASE_URL}/dex/tokens/${tokenAddress}`,
+          `${API_BASE}/token-pairs/v1/solana/${tokenAddress}`,
           {
             headers: {
               'User-Agent': USER_AGENT,
@@ -167,23 +180,15 @@ export async function getTokenInfo(
       { maxAttempts: 3, initialDelayMs: 1000 }
     );
 
-    const data = (await response.json()) as DexScreenerResponse;
+    const data = (await response.json()) as DexScreenerPair[];
 
-    if (!data.pairs || data.pairs.length === 0) {
+    if (!Array.isArray(data) || data.length === 0) {
       logger.debug({ tokenAddress }, 'No pairs found for token');
       return null;
     }
 
-    // Find the best pair (highest liquidity on Solana)
-    const solanaPairs = data.pairs.filter(p => p.chainId === 'solana');
-
-    if (solanaPairs.length === 0) {
-      logger.debug({ tokenAddress }, 'No Solana pairs found');
-      return null;
-    }
-
-    // Sort by liquidity and pick the best one
-    const bestPair = solanaPairs.sort((a, b) =>
+    // Find the best pair (highest liquidity)
+    const bestPair = data.sort((a, b) =>
       (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
     )[0];
 
@@ -200,6 +205,7 @@ export async function getTokenInfo(
 
 /**
  * Get pair info from DexScreener by pair address
+ * Uses /latest/dex/pairs/{chainId}/{pairId} endpoint (fast tier)
  */
 export async function getPairInfo(
   pairAddress: string
@@ -207,10 +213,12 @@ export async function getPairInfo(
   logger.debug({ pairAddress }, 'Fetching pair info from DexScreener');
 
   try {
+    await dexScreenerLimiter.waitForFast();
+
     const response = await retry(
       async () => {
         const res = await fetch(
-          `${BASE_URL}/dex/pairs/solana/${pairAddress}`,
+          `${API_BASE}/latest/dex/pairs/solana/${pairAddress}`,
           {
             headers: {
               'User-Agent': USER_AGENT,
@@ -243,6 +251,7 @@ export async function getPairInfo(
 
 /**
  * Search for tokens by symbol
+ * Uses /latest/dex/search endpoint (fast tier)
  * Returns Solana tokens matching the symbol
  */
 export async function searchBySymbol(
@@ -251,10 +260,12 @@ export async function searchBySymbol(
   logger.debug({ symbol }, 'Searching tokens by symbol');
 
   try {
+    await dexScreenerLimiter.waitForFast();
+
     const response = await retry(
       async () => {
         const res = await fetch(
-          `${BASE_URL}/dex/search/?q=${encodeURIComponent(symbol)}`,
+          `${API_BASE}/latest/dex/search?q=${encodeURIComponent(symbol)}`,
           {
             headers: {
               'User-Agent': USER_AGENT,
@@ -290,6 +301,7 @@ export async function searchBySymbol(
 
 /**
  * Get latest boosted tokens from DexScreener
+ * Uses /token-boosts/latest/v1 endpoint (slow tier: 60 req/min)
  * Returns tokens that are being actively promoted
  */
 export async function getBoostedTokens(
@@ -298,9 +310,11 @@ export async function getBoostedTokens(
   logger.debug({ limit }, 'Fetching boosted tokens from DexScreener');
 
   try {
+    await dexScreenerLimiter.waitForSlow();
+
     const response = await retry(
       async () => {
-        const res = await fetch(`${BOOSTS_BASE_URL}/token-boosts/latest/v1`, {
+        const res = await fetch(`${API_BASE}/token-boosts/latest/v1`, {
           headers: {
             'User-Agent': USER_AGENT,
             'Accept': 'application/json',
@@ -342,6 +356,7 @@ export async function getBoostedTokens(
 
 /**
  * Get top boosted tokens (most active boosts)
+ * Uses /token-boosts/top/v1 endpoint (slow tier: 60 req/min)
  */
 export async function getTopBoostedTokens(
   limit: number = 50
@@ -349,9 +364,11 @@ export async function getTopBoostedTokens(
   logger.debug({ limit }, 'Fetching top boosted tokens from DexScreener');
 
   try {
+    await dexScreenerLimiter.waitForSlow();
+
     const response = await retry(
       async () => {
-        const res = await fetch(`${BOOSTS_BASE_URL}/token-boosts/top/v1`, {
+        const res = await fetch(`${API_BASE}/token-boosts/top/v1`, {
           headers: {
             'User-Agent': USER_AGENT,
             'Accept': 'application/json',
@@ -389,8 +406,10 @@ export async function getTopBoostedTokens(
  * Get trending pairs on Solana
  *
  * Uses a two-step approach:
- * 1. Get boosted tokens (latest promotions)
- * 2. Fetch full pair data for each token
+ * 1. Get boosted tokens (latest promotions) - slow tier
+ * 2. Fetch full pair data using batch endpoint - fast tier
+ *
+ * Batch endpoint /tokens/v1/{chainId}/{addr1,addr2,...} supports up to 30 addresses
  */
 export async function getTrendingPairs(
   limit: number = 50
@@ -398,7 +417,7 @@ export async function getTrendingPairs(
   logger.debug({ limit }, 'Fetching trending Solana pairs via token-boosts');
 
   try {
-    // Step 1: Get boosted tokens
+    // Step 1: Get boosted tokens (slow tier)
     const boostedTokens = await getBoostedTokens(limit * 2); // Get extra for filtering
 
     if (boostedTokens.length === 0) {
@@ -408,68 +427,61 @@ export async function getTrendingPairs(
 
     logger.debug({ boostedCount: boostedTokens.length }, 'Fetched boosted tokens');
 
-    // Step 2: Fetch full pair data for each token (in batches)
+    // Step 2: Fetch full pair data using BATCH endpoint (fast tier)
+    // /tokens/v1/{chainId}/{addr1,addr2,...} - supports up to 30 addresses
     const pairs: DexScreenerPair[] = [];
-    const batchSize = 5;
+    const BATCH_SIZE = 30; // DexScreener's max
 
-    for (let i = 0; i < boostedTokens.length && pairs.length < limit; i += batchSize) {
-      const batch = boostedTokens.slice(i, i + batchSize);
+    for (let i = 0; i < boostedTokens.length; i += BATCH_SIZE) {
+      const batch = boostedTokens.slice(i, i + BATCH_SIZE);
+      const addresses = batch.map((b) => b.tokenAddress);
 
-      const batchPairs = await Promise.all(
-        batch.map(async (boost) => {
-          try {
-            const response = await retry(
-              async () => {
-                const res = await fetch(
-                  `${BOOSTS_BASE_URL}/token-pairs/v1/solana/${boost.tokenAddress}`,
-                  {
-                    headers: {
-                      'User-Agent': USER_AGENT,
-                      'Accept': 'application/json',
-                    },
-                  }
-                );
+      await dexScreenerLimiter.waitForFast();
 
-                if (!res.ok) {
-                  throw new Error(`Token pairs API returned ${res.status}`);
-                }
-
-                return res;
-              },
-              { maxAttempts: 2, initialDelayMs: 500 }
+      try {
+        const response = await retry(
+          async () => {
+            const res = await fetch(
+              `${API_BASE}/tokens/v1/solana/${addresses.join(',')}`,
+              {
+                headers: {
+                  'User-Agent': USER_AGENT,
+                  'Accept': 'application/json',
+                },
+              }
             );
 
-            const data = (await response.json()) as DexScreenerPair[];
-
-            if (Array.isArray(data) && data.length > 0) {
-              // Return the best pair (highest liquidity)
-              return data.sort(
-                (a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
-              )[0];
+            if (!res.ok) {
+              throw new Error(`Tokens batch API returned ${res.status}`);
             }
 
-            return null;
-          } catch (error) {
-            logger.debug(
-              { tokenAddress: boost.tokenAddress, error },
-              'Failed to fetch token pairs'
-            );
-            return null;
+            return res;
+          },
+          { maxAttempts: 3, initialDelayMs: 1000 }
+        );
+
+        const data = (await response.json()) as DexScreenerPair[];
+
+        if (Array.isArray(data)) {
+          // Filter to keep only one pair per token address (best liquidity)
+          const seenAddresses = new Set<string>();
+          for (const pair of data) {
+            const addr = pair.baseToken.address;
+            if (!seenAddresses.has(addr)) {
+              seenAddresses.add(addr);
+              pairs.push(pair);
+              if (pairs.length >= limit) break;
+            }
           }
-        })
-      );
-
-      // Add non-null pairs
-      for (const pair of batchPairs) {
-        if (pair && pairs.length < limit) {
-          pairs.push(pair);
         }
+      } catch (error) {
+        logger.debug(
+          { batchSize: batch.length, error },
+          'Failed to fetch batch token data'
+        );
       }
 
-      // Small delay between batches to respect rate limits
-      if (i + batchSize < boostedTokens.length) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      }
+      if (pairs.length >= limit) break;
     }
 
     logger.debug({ pairsFound: pairs.length }, 'Retrieved pair data for boosted tokens');
@@ -482,55 +494,92 @@ export async function getTrendingPairs(
 }
 
 /**
- * Get multi-pair info for multiple pair addresses
+ * Get multi-pair info for multiple token addresses (batch lookup)
+ * Uses /tokens/v1/{chainId}/{addr1,addr2,...} endpoint (fast tier)
+ * Supports up to 30 token addresses per request
+ */
+export async function getBatchTokenInfo(
+  tokenAddresses: string[]
+): Promise<TokenSearchResult[]> {
+  if (tokenAddresses.length === 0) {
+    return [];
+  }
+
+  if (tokenAddresses.length > 30) {
+    logger.warn(
+      { requested: tokenAddresses.length, limit: 30 },
+      'Too many addresses, truncating to 30'
+    );
+    tokenAddresses = tokenAddresses.slice(0, 30);
+  }
+
+  logger.debug(
+    { count: tokenAddresses.length },
+    'Fetching batch token info'
+  );
+
+  try {
+    await dexScreenerLimiter.waitForFast();
+
+    const response = await retry(
+      async () => {
+        const res = await fetch(
+          `${API_BASE}/tokens/v1/solana/${tokenAddresses.join(',')}`,
+          {
+            headers: {
+              'User-Agent': USER_AGENT,
+              'Accept': 'application/json',
+            },
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error(`DexScreener API returned ${res.status}`);
+        }
+
+        return res;
+      },
+      { maxAttempts: 3, initialDelayMs: 1000 }
+    );
+
+    const data = (await response.json()) as DexScreenerPair[];
+
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    return data.map(pairToSearchResult);
+  } catch (error) {
+    logger.error({ error }, 'Failed to fetch batch token info');
+    return [];
+  }
+}
+
+/**
+ * @deprecated Use getBatchTokenInfo for token addresses
+ * This function is kept for backward compatibility
  */
 export async function getMultiPairInfo(
   pairAddresses: string[]
 ): Promise<TokenSearchResult[]> {
+  // Note: DexScreener doesn't support batch lookup by pair addresses
+  // Only token addresses. This is a limitation of the API.
+  // For now, fetch pairs individually
   if (pairAddresses.length === 0) {
     return [];
   }
 
-  if (pairAddresses.length > 30) {
-    // DexScreener limits to 30 addresses per request
-    logger.warn(
-      { requested: pairAddresses.length, limit: 30 },
-      'Too many addresses, truncating to 30'
-    );
-    pairAddresses = pairAddresses.slice(0, 30);
+  const results: TokenSearchResult[] = [];
+
+  for (const pairAddress of pairAddresses.slice(0, 10)) {
+    // Limit to 10 for safety
+    const pair = await getPairInfo(pairAddress);
+    if (pair) {
+      results.push(pairToSearchResult(pair));
+    }
   }
 
-  logger.debug(
-    { count: pairAddresses.length },
-    'Fetching multi-pair info'
-  );
-
-  try {
-    const response = await fetch(
-      `${BASE_URL}/dex/pairs/solana/${pairAddresses.join(',')}`,
-      {
-        headers: {
-          'User-Agent': USER_AGENT,
-          'Accept': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`DexScreener API returned ${response.status}`);
-    }
-
-    const data = (await response.json()) as DexScreenerResponse;
-
-    if (!data.pairs) {
-      return [];
-    }
-
-    return data.pairs.map(pairToSearchResult);
-  } catch (error) {
-    logger.error({ error }, 'Failed to fetch multi-pair info');
-    return [];
-  }
+  return results;
 }
 
 // ============================================================================
