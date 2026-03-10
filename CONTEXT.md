@@ -28,14 +28,14 @@ Build a Solana crypto trading bot that:
 | 05-compounding.md | ✅ Complete | 3-stage compounding: build, growth, expansion |
 | 06-priority-fees.md | ✅ Complete | Dynamic priority fees, entry/exit strategies |
 | 07-error-recovery.md | ✅ Complete | RPC failover, transaction monitoring, circuit breakers |
+| 04-monitoring-exit.md | ✅ Complete | Real-time monitoring, trailing stop, exit handlers |
 
 ### 🔄 In Progress / Next Up
 
 | Topic | Status | Priority |
 |-------|--------|----------|
-| Exit Strategy Details | 📝 NEXT | Complete design/04-monitoring-exit.md |
-| Monitoring/Dashboard | 📝 Planned | Grafana setup, real-time metrics |
-| Implementation Plan | 📝 Planned | Phase-by-phase build guide |
+| Implementation Plan | 📝 NEXT | Phase-by-phase build guide |
+| User Approval | ⏳ Awaiting | Review all design docs before coding |
 
 ### ✅ Recently Completed (2026-03-10)
 
@@ -150,10 +150,10 @@ Picker/
 │   ├── 01-architecture.md       # Overall system design
 │   ├── 02-decimal-handling.md   # Token decimals solution
 │   ├── 03-paper-trading.md      # Paper trading architecture
+│   ├── 04-monitoring-exit.md    # Exit strategy & monitoring
 │   ├── 05-compounding.md        # Compounding strategy
 │   ├── 06-priority-fees.md      # Priority fee strategies
-│   ├── 07-error-recovery.md     # Error recovery & resilience
-│   ├── 04-monitoring-exit.md    # Exit strategy (pending)
+│   └── 07-error-recovery.md     # Error recovery & resilience
 ├── docs/                        # API docs (to be added)
 ├── src/                         # Source code (when ready to build)
 └── .env.example                 # Config template
@@ -194,10 +194,11 @@ From direct conversation:
 
 ## Next Steps (Current Session Priorities)
 
-**Design Status: 98% Complete**
+**Design Status: 100% Complete ✅**
 
-1. **Finalize Exit Strategy (04-monitoring-exit.md)** - WebSocket setup, trailing stop implementation (NEXT)
-2. **Implementation Plan** - Phase-by-phase build guide (after all design complete)
+1. **User Review & Approval** - Review all 7 design documents
+2. **Implementation Plan** - Create phase-by-phase build guide
+3. **Start Implementation** - After user sign-off
 
 ---
 
@@ -214,16 +215,29 @@ From direct conversation:
   - Circuit breaker pattern for external services
   - Exponential backoff retry strategy
   - State persistence for crash recovery
-  - Emergency pause/resume controls
+- **Exit Strategy & Monitoring (design/04-monitoring-exit.md):**
+  - Real-time price monitoring via Jupiter API polling (every 2 seconds)
+  - Position state machine (ENTERING → ACTIVE → PARTIAL_EXIT_1 → PARTIAL_EXIT_2 → TRAILING → CLOSED)
+  - All exit handlers: Stop Loss (-40%), Take Profit 1 (+50%), Take Profit 2 (+100%), Trailing Stop (15% below peak)
+  - Emergency exit conditions (liquidity crash, rug detection)
+  - Peak price tracking for trailing stop calculation
 
 **Key Insights:**
 - Priority fees on exits are almost always worth it
 - All state must be persisted BEFORE any trading action
 - Stuck transactions require manual verification on Solscan
+- **Trailing stop is the most critical exit mechanism** - locks in profits after +100% while allowing upside
 
-**Design Status:** 98% Complete
+**Design Status:** 100% Complete ✅
 
-**Next Priority:** Finalize Exit Strategy (WebSocket setup, trailing stop implementation)
+**All 7 Design Documents:**
+1. ✅ 01-architecture.md
+2. ✅ 02-decimal-handling.md (CRITICAL)
+3. ✅ 03-paper-trading.md
+4. ✅ 04-monitoring-exit.md
+5. ✅ 05-compounding.md
+6. ✅ 06-priority-fees.md
+7. ✅ 07-error-recovery.md
 
 ---
 

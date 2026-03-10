@@ -21,7 +21,7 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 📝 Design | ✅ 98% Complete | All designs complete except final exit strategy details |
+| 📝 Design | ✅ 100% Complete | All 7 design documents complete |
 | 🔨 Implementation | ⏳ Planned | Awaiting design sign-off |
 | 📊 Paper Trading | ⏳ Planned | 20+ trades before going live |
 | 🚀 Live Trading | ⏳ Planned | After paper trading validation |
@@ -85,10 +85,16 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 - **Transaction Monitoring:** Detect stuck tx after 60s
 - **State Persistence:** Save before/after every trade
 - **File:** `design/07-error-recovery.md`
-- **Build (0.1-0.3 SOL):** Fixed 0.1 SOL, compound +0.05 per 0.05 profit
-- **Growth (0.3-1.0 SOL):** Scale 0.15→0.25 SOL, compound +0.1 per 0.1 profit
-- **Expansion (1.0+ SOL):** 20% of portfolio, profit taking at 50% gain
-- **File:** `design/05-compounding.md`
+
+### 8. Exit Strategy (THE MOST CRITICAL)
+- **Real-Time Monitoring:** Jupiter API polling every 2 seconds
+- **Stop Loss:** -40% → Sell 50%
+- **Take Profit 1:** +50% → Sell 25%
+- **Take Profit 2:** +100% → Sell 25%, activate trailing stop
+- **Trailing Stop:** 15% below peak → Sell remaining 50%
+- **Max Hold:** 4 hours → Exit all remaining
+- **Emergency:** Liquidity crash/rug → Exit all immediately
+- **File:** `design/04-monitoring-exit.md`
 
 ---
 
@@ -103,7 +109,7 @@ Picker/
 │   ├── 01-architecture.md       # System architecture, API stack
 │   ├── 02-decimal-handling.md   # CRITICAL: Token decimals solution
 │   ├── 03-paper-trading.md      # Paper trading architecture
-│   ├── 04-monitoring-exit.md    # Exit strategy (pending)
+│   ├── 04-monitoring-exit.md    # Exit strategy & monitoring
 │   ├── 05-compounding.md        # Compounding strategy
 │   ├── 06-priority-fees.md      # Priority fee strategies
 │   └── 07-error-recovery.md     # Error recovery & resilience
