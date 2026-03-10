@@ -33,7 +33,13 @@ Build a Solana crypto trading bot that:
 |-------|--------|-----------------|
 | Error Recovery | 📝 Planned | RPC failures, stuck transactions |
 | Monitoring/Dashboard | 📝 Planned | Grafana setup, real-time metrics |
-| Exit Strategy Details | 📝 Planned | WebSocket setup, trailing stop implementation |
+| Exit Strategy Details | 🔄 In Progress | WebSocket setup, trailing stop implementation |
+
+### ✅ Recently Completed (2026-03-10)
+
+| Design Doc | Status | Description |
+|------------|--------|-------------|
+| 06-priority-fees.md | ✅ Complete | Dynamic priority fees, entry/exit strategies, cost-benefit analysis |
 
 ---
 
@@ -166,9 +172,8 @@ From direct conversation:
 ## Next Steps (Current Session Priorities)
 
 1. **Design Error Recovery** - RPC failures, stuck transactions, retry logic
-2. **Design Monitoring/Dashboard** - Grafana or CLI metrics
-3. **Finalize Exit Strategy** - WebSocket setup, trailing stop implementation
-4. **Create Implementation Plan** - Phase-by-phase build guide
+2. **Create Implementation Plan** - Phase-by-phase build guide
+3. **Finalize Exit Strategy (04-monitoring-exit.md)** - WebSocket setup, trailing stop implementation
 
 ---
 

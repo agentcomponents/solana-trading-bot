@@ -21,7 +21,7 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 📝 Design | 🔄 80% Complete | Architecture, decimals, paper trading, compounding done; error recovery, monitoring pending |
+| 📝 Design | ✅ 95% Complete | Architecture, decimals, paper trading, compounding, priority fees done; error recovery pending |
 | 🔨 Implementation | ⏳ Planned | Awaiting design sign-off |
 | 📊 Paper Trading | ⏳ Planned | 20+ trades before going live |
 | 🚀 Live Trading | ⏳ Planned | After paper trading validation |
