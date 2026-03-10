@@ -18,6 +18,7 @@ git pull origin main
 
 # Check current status
 git status
+git log --oneline -5
 ```
 
 ---
@@ -32,16 +33,80 @@ git status
 
 ---
 
-## Current Status: Design Phase
+## Current Status: IMPLEMENTATION COMPLETE ✅
 
-| Phase | Status |
-|-------|--------|
-| 📝 Architecture Design | ✅ Complete |
-| 🔨 Implementation | ⏳ NOT STARTED - Awaiting user sign-off |
-| 📊 Paper Trading | ⏳ Planned |
-| 🚀 Live Trading | ⏳ Planned |
+| Phase | Status | Tests |
+|-------|--------|-------|
+| Phase 1: Project Foundation | ✅ Complete | 93 tests |
+| Phase 2: Database + APIs | ✅ Complete | 225+ tests |
+| Phase 3: Trading Engine | ✅ Complete | 298+ tests |
+| Phase 4: Paper Trading | ✅ Complete | 31 tests |
+| Phase 5: Main Bot | ✅ Complete | 15 tests |
 
-**CRITICAL: Do NOT start coding until all design is finalized and user approves.**
+**Total: 364 tests passing ✅**
+
+**Current State:** Bot is fully implemented and currently running in paper trading mode.
+
+---
+
+## Quick Commands
+
+```bash
+# Build and test
+npm run build      # TypeScript compilation
+npm test -- --run  # Run all 364 tests
+
+# Run the bot
+npm run start:paper  # Paper trading mode (simulated)
+npm run start:live   # Live trading mode (REAL MONEY)
+
+# Monitor and report
+npm run status       # Show current positions
+npm run report       # Generate performance report
+
+# Manual tests
+npx tsx tests/manual/test-paper-trading.ts  # Full paper trading cycle test
+npx tsx tests/manual/test-live-swap.ts      # Test live SOL→USDC swap
+npx tsx tests/manual/test-swap-back.ts      # Test USDC→SOL swap
+```
+
+---
+
+## Configuration
+
+### Environment Variables (.env)
+
+```bash
+# Trading Mode: paper or live
+TRADING_MODE=live
+
+# Wallet (NEVER commit)
+WALLET_PRIVATE_KEY=your_key_here
+
+# RPC endpoints
+HELIUS_RPC_URL=https://beta.helius-rpc.com/?api-key=YOUR_KEY
+HELIUS_WS_URL=wss://beta.helius-rpc.com/?api-key=YOUR_KEY
+BACKUP_RPC_URL=https://api.mainnet-beta.solana.com
+
+# APIs
+JUPITER_API_KEY=your_key
+GOPLUS_API_KEY=your_key
+```
+
+### Trading Parameters
+
+| Parameter | Value |
+|-----------|-------|
+| Initial Capital | 0.1 SOL |
+| Entry Slippage | 1% (100 bps) |
+| Exit Slippage | 3% (300 bps) |
+| Max Positions | 1 |
+| Scan Interval | 60 seconds |
+| Stop Loss | -40% |
+| Take Profit 1 | +50% (sell 25%) |
+| Take Profit 2 | +100% (sell 25%, activate trailing) |
+| Trailing Stop | 15% below peak |
+| Max Hold Time | 4 hours |
 
 ---
 
@@ -57,8 +122,6 @@ git status
 - At EXIT, use stored raw amount directly - NO conversion
 - Only convert to human amounts for display and P&L calculation
 
-**File:** `design/02-decimal-handling.md`
-
 ```typescript
 // CORRECT PATTERN (must follow)
 const position = {
@@ -72,58 +135,36 @@ await jupiter.swap({
 })
 ```
 
-### 2. Entry Strategy (User Confirmed)
+### 2. Foreign Key Constraints
 
-| Parameter | Value |
-|-----------|-------|
-| Timing | Wait 1-2 confirmations with limit orders |
-| Slippage | 1% (100 bps) |
-| Min Liquidity | $15,000 USD / 50 SOL pool |
-| Safety Checks | ALL: RugCheck + GoPlus + Token Sniffer |
+**Important:** When creating a position, the `token_metadata` entry must exist first.
 
-### 3. Exit Strategy (User Confirmed)
+```typescript
+// In paper engine, before creating position:
+this.tokenMetadataRepo.getOrCreate(token.address, {
+  symbol: tokenMetadata.symbol,
+  name: token.name || tokenMetadata.symbol,
+  decimals: tokenMetadata.decimals,
+});
+```
 
-| Condition | Trigger |
-|-----------|---------|
-| Stop Loss | -40% |
-| Trailing Stop | 15% below peak (after +100%) |
-| Max Hold Time | 4 hours |
-| Partial Exit 1 | 25% at +50% |
-| Partial Exit 2 | 25% at +100% |
-| Remaining | Trailing stop |
+### 3. Exit Reason Enum
 
-### 4. Paper Trading Before Live
+**Valid exit reasons** (CHECK constraint in database):
+- `STOP_LOSS`
+- `TAKE_PROFIT_1`
+- `TAKE_PROFIT_2`
+- `TRAILING_STOP`
+- `MAX_HOLD_TIME`
+- `EMERGENCY`
+- `MANUAL`
 
-- Minimum 20 trades
-- Win rate ≥ 40%
-- Max drawdown < 30%
-- Real quotes, simulated execution with realistic slippage
+### 4. RPC Configuration
 
----
+**Primary:** Helius RPC (user's API key)
+**Backup:** Solana public RPC (`https://api.mainnet-beta.solana.com`)
 
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Language | TypeScript / Node.js 20+ |
-| Blockchain | @solana/web3.js |
-| DEX Aggregation | @jup-ag/core |
-| Database | Better SQLite3 |
-| Validation | Zod |
-| Real-time | WebSocket (Helius) |
-| Container | Docker |
-
----
-
-## API Keys Status
-
-| API | Status | Purpose |
-|-----|--------|---------|
-| Helius RPC | ✓ User has | Primary RPC + WebSocket |
-| Jupiter API | ✓ User has | Quotes + Swaps |
-| GoPlus Security | ⏳ Need to get | Token safety |
-| RugCheck | ✓ Free | No key needed |
-| DexScreener CLI | ✓ User has | Token scanning |
+**Never use placeholder URLs** like `https://backup.rpc.com`
 
 ---
 
@@ -134,82 +175,121 @@ Picker/
 ├── CLAUDE.md              # THIS FILE - Read first!
 ├── CONTEXT.md             # Session context summary
 ├── README.md              # Project overview
+├── .env                   # Actual config (NEVER commit)
 ├── .env.example           # Configuration template
-├── design/                # All design documents
-│   ├── 01-architecture.md     # System architecture
-│   ├── 02-decimal-handling.md # CRITICAL: Decimal solution
-│   ├── 03-paper-trading.md    # Paper trading design
-│   ├── 04-monitoring-exit.md  # Exit strategy & monitoring
-│   ├── 05-compounding.md      # Compounding logic
-│   ├── 06-priority-fees.md    # Priority fee strategies
-│   └── 07-error-recovery.md   # Error recovery & resilience
-│   └── 07-error-recovery.md   # Error recovery & resilience
-├── docs/                  # API references (empty for now)
-└── src/                   # Source code (NOT CREATED YET)
+├── package.json
+├── tsconfig.json
+├── design/                # All design documents (complete)
+│   ├── 01-architecture.md
+│   ├── 02-decimal-handling.md
+│   ├── 03-paper-trading.md
+│   ├── 04-monitoring-exit.md
+│   ├── 05-compounding.md
+│   ├── 06-priority-fees.md
+│   └── 07-error-recovery.md
+├── src/
+│   ├── types/             # Core types and Zod schemas
+│   ├── config/            # Environment validation
+│   ├── utils/             # Utilities (decimal, sleep, retry, logger)
+│   ├── db/                # Database layer (Better SQLite3)
+│   ├── solana/            # Solana connection, wallet
+│   ├── jupiter/           # Jupiter API client (quotes + swaps)
+│   ├── scanner/           # DexScreener client
+│   ├── safety/            # RugCheck + GoPlus safety
+│   ├── entry/             # Entry logic
+│   ├── exit/              # Exit logic (strategy, executor, orchestrator)
+│   ├── paper/             # Paper trading (engine, wallet, slippage)
+│   ├── bot/               # Main bot orchestrator, config
+│   ├── cli/               # CLI commands
+│   └── index.ts           # Main entry point
+├── tests/
+│   ├── unit/              # 364 unit tests
+│   ├── integration/       # API integration tests
+│   └── manual/            # Manual test scripts
+└── data/                  # SQLite database
+    └── trading-bot.db
 ```
+
+---
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Language | TypeScript / Node.js 20+ |
+| Blockchain | @solana/web3.js |
+| DEX Aggregation | @jup-ag/api |
+| Database | Better SQLite3 |
+| Validation | Zod |
+| Real-time | WebSocket (Helius) |
+| Testing | Vitest |
+
+---
+
+## API Keys Status
+
+| API | Status | Purpose |
+|-----|--------|---------|
+| Helius RPC | ✓ Configured | Primary RPC + WebSocket |
+| Jupiter API | ✓ Configured | Quotes + Swaps |
+| GoPlus Security | ✓ Configured | Token safety |
+| RugCheck | ✓ Free | Rug pull detection |
 
 ---
 
 ## When Resuming This Project
 
 1. **Read CONTEXT.md** - Contains session summary and next steps
-2. **Read design/** folder - Review completed design documents
-3. **Check git status** - See what's changed since last session
+2. **Check if bot is running:** `ps aux | grep tsx`
+3. **Check status:** `npm run status`
 4. **Ask user** - "What would you like to work on today?"
 
 ---
 
-## Commands for Development
+## Testing Status
 
-```bash
-# Git operations
-git status
-git log --oneline -10
-git pull origin main
-git add -A
-git commit -m "message"
-git push
+| Test Type | Count | Status |
+|-----------|-------|--------|
+| Unit Tests | 364 | ✅ Passing |
+| Integration | - | ✅ Working |
+| Manual Tests | 3 | ✅ Passing |
 
-# When ready to implement (NOT YET)
-npm install
-npm run build
-npm run dev
-```
+### Manual Tests (All Passing)
+
+1. **test-paper-trading.ts** - Full paper trading cycle (scan → entry → exit → DB)
+2. **test-live-swap.ts** - Live SOL → USDC swap (tested with 0.01 SOL)
+3. **test-swap-back.ts** - Live USDC → SOL swap (restored balance)
 
 ---
 
-## Implementation Checklist (NOT STARTED)
+## Live Trading Readiness Criteria
 
-When user approves design, follow this order:
+Before switching from paper to live trading:
 
-- [ ] Phase 1: Project Setup
-  - [ ] Initialize TypeScript project
-  - [ ] Set up Docker
-  - [ ] Create database schema
-  - [ ] Set up environment validation
+| Criterion | Threshold | Current |
+|-----------|-----------|---------|
+| Minimum Paper Trades | ≥ 20 | ⏳ In progress |
+| Win Rate | ≥ 40% | ⏳ TBD |
+| Max Drawdown | < 30% | ⏳ TBD |
+| Positive P&L | Yes | ⏳ TBD |
 
-- [ ] Phase 2: Core Infrastructure
-  - [ ] Solana connection (Helius RPC)
-  - [ ] Token metadata fetching
-  - [ ] Decimal conversion utilities
-  - [ ] Database layer
+**Current Status:** Bot is running in paper trading mode to gather performance data.
 
-- [ ] Phase 3: Trading Engine
-  - [ ] Jupiter swap executor
-  - [ ] Token scanner (DexScreener CLI integration)
-  - [ ] Safety checkers (RugCheck, GoPlus)
-  - [ ] Entry/exit logic
+---
 
-- [ ] Phase 4: Paper Trading
-  - [ ] Slippage simulator
-  - [ ] Paper trading engine
-  - [ ] Price monitoring
-  - [ ] Performance analytics
+## Known Issues & Fixes
 
-- [ ] Phase 5: Live Trading
-  - [ ] Error recovery
-  - [ ] Real-time monitoring
-  - [ ] Dashboard/CLI
+### Fixed Issues
+
+1. **Helius preflight error** - Fixed by setting `skipPreflight: true`
+2. **FOREIGN KEY constraint** - Fixed by creating token metadata before position
+3. **exitReason CHECK constraint** - Fixed by using valid enum values ('MANUAL', not custom strings)
+4. **Backup RPC placeholder** - Fixed tests to use real Solana public RPC
+5. **start:paper not forcing paper mode** - Fixed by setting `process.env.TRADING_MODE = 'paper'` before loading config
+
+### GoPlus API Warnings
+
+The GoPlus security API occasionally returns errors. The system gracefully handles this and continues with other safety checks (RugCheck).
 
 ---
 
@@ -219,7 +299,7 @@ When user approves design, follow this order:
 
 > "some issues i had in the past included which decimal the token was using (6 to 9), as this could skew the sell balance when trying to exit."
 
-**This is why design/02-decimal-handling.md is CRITICAL.**
+**This is why the decimal handling solution is CRITICAL.**
 
 ### User's Paper Trading Requirement
 
@@ -227,40 +307,31 @@ When user approves design, follow this order:
 
 **No live trading until 20+ successful paper trades.**
 
----
+### User's Live Trading Test Instructions
 
-## Next Steps (Current Design Phase)
+> "are there other background services trying to access the api? . kill all and clean up the environment. start with a fresh build"
 
-1. ✅ Architecture design
-2. ✅ Decimal handling solution
-3. ✅ Paper trading architecture
-4. ✅ Position compounding logic
-5. ✅ Priority fee strategies
-6. ✅ Error recovery design
-7. ✅ **Exit strategy & monitoring**
-8. ⏳ **User review & approval** (NEXT)
-9. ⏳ Implementation plan
+> "swap a small amount to USDC 0.01"
+> "swap back to sol"
+> "we cannot start trading yet. we need to test the system"
 
----
-
-## Testing Requirements
-
-**MANDATORY:** Test-Driven Development with 80%+ coverage
-
-- Unit tests for all utilities
-- Integration tests for API calls
-- E2E tests for critical flows
-- Paper trading validation tests
+**Live swap tests completed successfully ✅**
 
 ---
 
 ## Git Workflow
 
-```
-1. Create/update design docs
-2. Commit with descriptive message
-3. Push to GitHub
-4. Update CONTEXT.md with progress
+```bash
+# Check status
+git status
+git log --oneline -5
+
+# Commit changes
+git add -A
+git commit -m "type: description"
+
+# Push to remote
+git push origin main
 ```
 
 **Never commit:**
@@ -270,5 +341,18 @@ When user approves design, follow this order:
 
 ---
 
+## Recent Commits
+
+```
+9513bd1 fix: use real Solana public RPC as backup (not placeholder)
+300fa9d fix: paper trading foreign key constraint + test fixes
+d5ff489 fix: update DexScreener API to use token-boosts + token-pairs
+c868d13 feat: implement Phase 5 Main Bot Orchestrator
+9744b8c docs: prepare session handoff - Phase 4 complete
+```
+
+---
+
 *Last Updated: 2026-03-10*
-*Session Phase: Design & Architecture (100% Complete ✅)*
+*Session: Paper Trading Validation In Progress*
+*Status: Bot running in paper mode, gathering performance data*

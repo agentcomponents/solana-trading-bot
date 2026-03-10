@@ -37,6 +37,9 @@ export async function startPaperTrading(): Promise<CommandResult> {
   try {
     logger.info('Starting paper trading bot...');
 
+    // Force paper mode regardless of .env setting
+    process.env.TRADING_MODE = 'paper';
+
     const config = loadBotConfig();
 
     if (config.mode !== 'paper') {
