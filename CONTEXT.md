@@ -26,20 +26,22 @@ Build a Solana crypto trading bot that:
 | 02-decimal-handling.md | ✅ Complete | CRITICAL: Solving 6-9 decimal token issue |
 | 03-paper-trading.md | ✅ Complete | Paper trading architecture with realistic simulation |
 | 05-compounding.md | ✅ Complete | 3-stage compounding: build, growth, expansion |
+| 06-priority-fees.md | ✅ Complete | Dynamic priority fees, entry/exit strategies |
 
-### 🔄 In Progress
+### 🔄 In Progress / Next Up
 
-| Topic | Status | Next Discussion |
-|-------|--------|-----------------|
-| Error Recovery | 📝 Planned | RPC failures, stuck transactions |
+| Topic | Status | Priority |
+|-------|--------|----------|
+| Error Recovery | 📝 NEXT | RPC failures, stuck transactions, retry logic |
 | Monitoring/Dashboard | 📝 Planned | Grafana setup, real-time metrics |
-| Exit Strategy Details | 🔄 In Progress | WebSocket setup, trailing stop implementation |
+| Exit Strategy Details | 📝 Planned | Complete design/04-monitoring-exit.md |
 
 ### ✅ Recently Completed (2026-03-10)
 
-| Design Doc | Status | Description |
-|------------|--------|-------------|
-| 06-priority-fees.md | ✅ Complete | Dynamic priority fees, entry/exit strategies, cost-benefit analysis |
+| Design Doc | Description |
+|------------|-------------|
+| 06-priority-fees.md | Dynamic priority fees, entry/exit strategies, cost-benefit analysis |
+| 05-compounding.md | 3-stage compounding with drawdown protection |
 
 ---
 
@@ -91,6 +93,14 @@ await jupiter.swap({
 
 **Full Design:** `design/05-compounding.md`
 
+### 6. Priority Fee Strategy (Entry vs Exit)
+- **Entry:** Conservative fees (10K-50K lamports) - opportunity cost only
+- **Exit:** Aggressive fees (100K-1M+ lamports) - speed is critical
+- **Dynamic Scaling:** Higher fees for higher profits, emergency fees for trailing stop
+- **Cost-Benefit:** Priority fees pay for themselves 20x on average
+
+**Full Design:** `design/06-priority-fees.md`
+
 ---
 
 ## Technical Stack
@@ -130,6 +140,7 @@ Picker/
 │   ├── 02-decimal-handling.md   # Token decimals solution
 │   ├── 03-paper-trading.md      # Paper trading architecture
 │   ├── 05-compounding.md        # Compounding strategy
+│   ├── 06-priority-fees.md      # Priority fee strategies
 │   ├── 04-monitoring-exit.md    # Exit strategy (pending)
 ├── docs/                        # API docs (to be added)
 ├── src/                         # Source code (when ready to build)
@@ -171,21 +182,30 @@ From direct conversation:
 
 ## Next Steps (Current Session Priorities)
 
-1. **Design Error Recovery** - RPC failures, stuck transactions, retry logic
-2. **Create Implementation Plan** - Phase-by-phase build guide
-3. **Finalize Exit Strategy (04-monitoring-exit.md)** - WebSocket setup, trailing stop implementation
+**Design Status: 95% Complete**
+
+1. **Error Recovery Design** - RPC failures, stuck transactions, retry logic (NEXT)
+2. **Finalize Exit Strategy (04-monitoring-exit.md)** - WebSocket setup, trailing stop implementation
+3. **Implementation Plan** - Phase-by-phase build guide (after all design complete)
 
 ---
 
-## Last Session Summary (2025-03-10)
+## Last Session Summary (2026-03-10)
 
 **Completed:**
-- Designed paper trading architecture with realistic slippage simulation
-- Defined performance analytics and readiness criteria for going live
-- Discussed Docker setup for safety isolation
-- **Completed compounding strategy** with 3 stages (build, growth, expansion)
+- **Priority Fees Research (design/06-priority-fees.md):**
+  - Dynamic fee strategy: Conservative entry (10K-50K lamports), Aggressive exit (100K-1M+ lamports)
+  - Cost-benefit analysis: Priority fees pay for themselves 20x on average
+  - Jupiter integration with `prioritizationFeeLamports` parameter
+  - Dynamic fee calculation based on profit level and urgency
+  - Network condition monitoring via Helius WebSocket
+  - Configuration examples (conservative vs aggressive)
 
-**Key Insight:** Compounding scales position size gradually with profits but scales down quickly on losses. Stage downgrades protect capital during drawdowns.
+**Key Insight:** Priority fees on exits are almost always worth it. The cost (0.0001-0.001 SOL) is minimal compared to the risk of price slippage while waiting for confirmation.
+
+**Design Status:** 95% Complete
+
+**Next Priority:** Error Recovery Design (RPC failures, stuck transactions, retry logic)
 
 ---
 

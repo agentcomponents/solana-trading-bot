@@ -21,7 +21,7 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 📝 Design | ✅ 95% Complete | Architecture, decimals, paper trading, compounding, priority fees done; error recovery pending |
+| 📝 Design | ✅ 95% Complete | Architecture, decimals, paper trading, compounding, priority fees done; error recovery, monitoring pending |
 | 🔨 Implementation | ⏳ Planned | Awaiting design sign-off |
 | 📊 Paper Trading | ⏳ Planned | 20+ trades before going live |
 | 🚀 Live Trading | ⏳ Planned | After paper trading validation |
@@ -81,12 +81,14 @@ This bot scans for tokens about to pump using the DexScreener CLI tool, executes
 Picker/
 ├── README.md                    # This file
 ├── CONTEXT.md                   # Quick session context
+├── CLAUDE.md                    # Claude session instructions
 ├── design/                      # Design documents
-│   ├── 01-architecture.md
-│   ├── 02-decimal-handling.md
-│   ├── 03-paper-trading.md
-│   ├── 04-monitoring-exit.md
-│   └── 05-compounding.md
+│   ├── 01-architecture.md       # System architecture, API stack
+│   ├── 02-decimal-handling.md   # CRITICAL: Token decimals solution
+│   ├── 03-paper-trading.md      # Paper trading architecture
+│   ├── 04-monitoring-exit.md    # Exit strategy (pending)
+│   ├── 05-compounding.md        # Compounding strategy
+│   └── 06-priority-fees.md      # Priority fee strategies
 ├── docs/                        # API references
 ├── src/                         # Source code (when implemented)
 │   ├── config/
@@ -130,4 +132,4 @@ MIT
 
 ---
 
-*Last Updated: 2025-03-10*
+*Last Updated: 2026-03-10*
