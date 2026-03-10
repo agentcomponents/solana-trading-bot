@@ -248,8 +248,9 @@ export async function executeSwap(params: ExecuteSwapParams): Promise<ExecuteSwa
     logger.debug({ lastValidBlockHeight: swapResult.lastValidBlockHeight }, 'Transaction signed');
 
     // Step 4: Send transaction
+    // Skip preflight check as some RPCs (like Helius) don't support it
     const signature = await connection.sendTransaction(transaction, {
-      skipPreflight: false,
+      skipPreflight: true,
       maxRetries: 3,
     });
 
