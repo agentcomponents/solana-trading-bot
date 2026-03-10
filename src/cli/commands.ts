@@ -241,10 +241,14 @@ export async function showStatus(): Promise<CommandResult> {
     const db = dbClient.getDb();
 
     const { createPositionRepository } = await import('../db/repositories/positions.js');
+    const { createTokenMetadataRepository } = await import('../db/repositories/token-metadata.js');
     const positionsRepo = createPositionRepository(db);
+    const metadataRepo = createTokenMetadataRepository(db);
 
-    const activePositions = positionsRepo.findActive();
-    const closedPositions = positionsRepo.findAll().filter(p => p.state === 'CLOSED');
+    // Get all non-closed positions (ACTIVE, ENTERING, PARTIAL_EXIT, etc.)
+    const allPositions = positionsRepo.findAll();
+    const activePositions = allPositions.filter(p => p.state !== 'CLOSED');
+    const closedPositions = allPositions.filter(p => p.state === 'CLOSED');
 
     const lines = [
       '═══════════════════════════════════════════════════════════════',
@@ -265,21 +269,42 @@ export async function showStatus(): Promise<CommandResult> {
 
     if (activePositions.length > 0) {
       lines.push('  Active Positions:');
-      for (const pos of activePositions.slice(0, 10)) {
+      lines.push('');
+
+      for (const pos of activePositions) {
+        const metadata = metadataRepo.findById(pos.tokenMint);
+        const symbol = metadata?.symbol || 'UNKNOWN';
         const entryPrice = pos.entryPricePerToken;
         const peakPrice = pos.peakPricePerToken;
         const pnl = ((peakPrice - entryPrice) / entryPrice) * 100;
         const heldTime = Math.floor((Date.now() - pos.entryTimestamp) / 60000); // minutes
-        const tokenDisplay = pos.tokenMint.slice(0, 8);
+        const entrySol = Number(pos.entrySolSpent) / 1e9;
+        const tokensHeld = Number(pos.tokensReceivedRaw) / Math.pow(10, pos.tokenDecimals);
 
-        lines.push(
-          `  - ${tokenDisplay.padEnd(10)} | ${pnl >= 0 ? '+' : ''}${pnl.toFixed(1)}% | Held: ${heldTime}m | ${pos.state}`
-        );
+        // Format entry time
+        const entryDate = new Date(pos.entryTimestamp);
+        const timeStr = entryDate.toLocaleTimeString();
+
+        // Calculate next exit thresholds
+        const tp1Price = entryPrice * 1.5;  // +50%
+        const tp2Price = entryPrice * 2.0;  // +100%
+        const slPrice = entryPrice * 0.6;   // -40%
+
+        lines.push(`  📊 ${symbol} (${pos.state})`);
+        lines.push(`     Token:      ${pos.tokenMint}`);
+        lines.push(`     DexScreener: https://dexscreener.com/solana/${pos.tokenMint}`);
+        lines.push(`     Entry Time: ${timeStr} (${heldTime}m ago)`);
+        lines.push(`     Entry:      ${entrySol.toFixed(6)} SOL → ${tokensHeld.toFixed(2)} tokens`);
+        lines.push(`     Entry Price: ${entryPrice.toFixed(8)} SOL/token`);
+        lines.push(`     Current:    ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}% (peak: ${((peakPrice / entryPrice - 1) * 100).toFixed(1)}%)`);
+        lines.push('');
+        lines.push(`     Exit Thresholds:`);
+        lines.push(`       Stop Loss:     -40% → ${slPrice.toFixed(8)} SOL`);
+        lines.push(`       Take Profit 1: +50% → ${tp1Price.toFixed(8)} SOL (sell 25%)`);
+        lines.push(`       Take Profit 2: +100% → ${tp2Price.toFixed(8)} SOL (sell 25%, activate trailing)`);
+        lines.push(`       Max Hold Time: 4 hours`);
+        lines.push('');
       }
-      if (activePositions.length > 10) {
-        lines.push(`  ... and ${activePositions.length - 10} more`);
-      }
-      lines.push('');
     }
 
     lines.push('═══════════════════════════════════════════════════════════════');
