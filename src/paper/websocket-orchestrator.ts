@@ -476,7 +476,14 @@ export class WebSocketPaperOrchestrator {
     );
 
     try {
-      const result = await this.paperEngine.executeExit(positionId, exitReason);
+      // Get position from engine before executing exit
+      const position = this.paperEngine.getPosition(positionId);
+      if (!position) {
+        logger.warn({ positionId }, 'Position not found for exit');
+        return;
+      }
+
+      const result = await this.paperEngine.executeExit(position, exitReason);
 
       const heldMinutes = (Date.now() - meta.enteredAt) / (1000 * 60);
 
@@ -612,7 +619,7 @@ export const DEFAULT_PAPER_OPTIONS: Partial<PaperTradingOrchestratorOptions> = {
   defaultSlippageBps: 100, // 1%
   minOpportunityScore: 60,
   minSafetyConfidence: 'medium',
-  enabledAges: ['fresh', 'warm'],
+  enabledAges: [TokenAge.FRESH, TokenAge.WARM],
   maxPositions: 3,
   exitStrategy: {
     fresh: {

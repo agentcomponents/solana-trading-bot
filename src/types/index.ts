@@ -340,6 +340,161 @@ export const CompoundingStateSchema = z.object({
 // TYPE INFERENCE
 // ============================================================================
 
+// ============================================================================
+// API RESPONSE VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Zod schemas for validating external API responses
+ * These provide security by ensuring all API data matches expected structure
+ */
+
+/**
+ * DexScreener WebSocket boost message validation
+ */
+export const DexScreenerBoostSchema = z.object({
+  url: z.string().optional(),
+  chainId: z.string(),
+  tokenAddress: z.string().length(44),
+  amount: z.number().optional(),
+  totalAmount: z.number().optional(),
+  icon: z.string().optional(),
+  header: z.string().optional(),
+  description: z.string().nullable().optional(),
+});
+
+export const DexScreenerBoostMessageSchema = z.object({
+  limit: z.number().optional(),
+  data: z.array(DexScreenerBoostSchema).max(100), // Max 100 items for DoS protection
+});
+
+/**
+ * RugCheck API risk level validation
+ */
+export const RugCheckRiskLevelSchema = z.enum(['info', 'warn', 'error', 'critical']);
+
+/**
+ * RugCheck API risk factor validation
+ */
+export const RugCheckRiskSchema = z.object({
+  name: z.string(),
+  value: z.string(),
+  description: z.string(),
+  score: z.number(),
+  level: RugCheckRiskLevelSchema,
+});
+
+/**
+ * RugCheck API token info validation
+ */
+export const RugCheckTokenSchema = z.object({
+  mintAuthority: z.string().nullable(),
+  supply: z.number(),
+  decimals: z.number().int().min(0).max(9),
+  isInitialized: z.boolean(),
+  freezeAuthority: z.string().nullable(),
+}).nullable();
+
+/**
+ * RugCheck API token metadata validation
+ */
+export const RugCheckTokenMetaSchema = z.object({
+  name: z.string(),
+  symbol: z.string(),
+  uri: z.string(),
+  mutable: z.boolean(),
+  updateAuthority: z.string(),
+}).nullable();
+
+/**
+ * RugCheck API locker validation
+ */
+export const RugCheckLockerSchema = z.object({
+  programID: z.string(),
+  tokenAccount: z.string(),
+  owner: z.string(),
+  uri: z.string(),
+  unlockDate: z.number(),
+  usdcLocked: z.number(),
+  type: z.string(),
+});
+
+/**
+ * RugCheck API full report validation
+ */
+export const RugCheckReportSchema = z.object({
+  mint: z.string().length(44),
+  tokenProgram: z.string(),
+  creator: z.string().nullable(),
+  creatorBalance: z.number(),
+  token: RugCheckTokenSchema,
+  token_extensions: z.unknown(),
+  tokenMeta: RugCheckTokenMetaSchema,
+  topHolders: z.array(z.unknown()).nullable().optional(),
+  freezeAuthority: z.string().nullable(),
+  mintAuthority: z.string().nullable(),
+  risks: z.array(RugCheckRiskSchema).nullable(),
+  score: z.number().nonnegative(),
+  score_normalised: z.number().nonnegative(),
+  fileMeta: z.unknown(),
+  lockerOwners: z.record(z.string(), z.unknown()).nullable().optional(),
+  lockers: z.record(z.string(), RugCheckLockerSchema).nullable().optional(),
+  markets: z.array(z.unknown()).nullable().optional(),
+  totalMarketLiquidity: z.number().nonnegative(),
+  totalStableLiquidity: z.number().nonnegative(),
+  totalLPProviders: z.number().int().nonnegative(),
+  totalHolders: z.number().int().nonnegative(),
+  price: z.number().nonnegative(),
+  rugged: z.boolean(),
+  tokenType: z.string(),
+  transferFee: z.object({
+    pct: z.number(),
+    maxAmount: z.number(),
+    authority: z.string(),
+  }),
+  knownAccounts: z.array(z.unknown()).nullable().optional(),
+  events: z.array(z.unknown()).nullable().optional(),
+  verification: z.unknown(),
+  graphInsidersDetected: z.number().int().nonnegative(),
+  insiderNetworks: z.array(z.unknown()).nullable().optional(),
+  detectedAt: z.string(),
+  creatorTokens: z.array(z.unknown()).nullable().optional(),
+  launchpad: z.string().nullable().optional(),
+  deployPlatform: z.string(),
+}).passthrough(); // Allow additional fields
+
+/**
+ * Jupiter API quote response validation
+ */
+export const JupiterQuoteSchema = z.object({
+  inputMint: z.string().length(44),
+  inAmount: z.string(),
+  outputMint: z.string().length(44),
+  outAmount: z.string(),
+  otherAmountThreshold: z.string(),
+  swapMode: z.enum(['ExactIn', 'ExactOut']),
+  slippageBps: z.number().int().nonnegative(),
+  routePlan: z.array(z.object({
+    swapInfo: z.object({
+      ammKey: z.string().optional(),
+      label: z.string().optional(),
+      inputMint: z.string(),
+      outputMint: z.string(),
+      inAmount: z.string(),
+      outAmount: z.string(),
+      feeAmount: z.string(),
+      feeMint: z.string().optional(),
+    }),
+    percent: z.number(),
+  })),
+  contextSlot: z.number().optional(),
+  timeTaken: z.number().optional(),
+}).passthrough(); // Allow additional fields
+
+// ============================================================================
+// TYPE INFERENCE
+// ============================================================================
+
 /**
  * Infer types from Zod schemas for use in application code
  */
@@ -348,3 +503,10 @@ export type ValidatedTokenMetadata = z.infer<typeof TokenMetadataSchema>;
 export type ValidatedTrade = z.infer<typeof TradeSchema>;
 export type ValidatedSafetyCheckResult = z.infer<typeof SafetyCheckResultSchema>;
 export type ValidatedCompoundingState = z.infer<typeof CompoundingStateSchema>;
+
+/**
+ * API response validated types
+ */
+export type ValidatedDexScreenerBoostMessage = z.infer<typeof DexScreenerBoostMessageSchema>;
+export type ValidatedRugCheckReport = z.infer<typeof RugCheckReportSchema>;
+export type ValidatedJupiterQuote = z.infer<typeof JupiterQuoteSchema>;

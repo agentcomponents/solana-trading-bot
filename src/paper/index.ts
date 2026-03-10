@@ -43,7 +43,7 @@ export {
   PaperTradingEngine,
   createPaperTradingEngine,
   type PaperEntryResult,
-  type PaperExitResult,
+  type PaperExitResult as EngineExitResult,
   type PaperTradeConfig,
 } from './engine';
 

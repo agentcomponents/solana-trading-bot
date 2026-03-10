@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../utils/logger';
-import { startWebSocketDiscovery, type DiscoveredToken, type TokenAge } from '../scanner/websocket-discovery';
+import { startWebSocketDiscovery, type DiscoveredToken, TokenAge } from '../scanner/websocket-discovery';
 import { checkTokenSafetyAggregate } from '../safety/aggregator';
 import { validateMultipleEntries } from './validator';
 import { prepareEntry } from './executor';
@@ -42,12 +42,12 @@ export interface WebSocketOrchestratorOptions {
   // Callback when a token is discovered
   onTokenDiscovered?: (token: DiscoveredToken) => void;
   // Callback when entry is prepared
-  onEntryPrepared?: (entry: EntryResult) => void;
+  onEntryPrepared?: (entry: WebSocketEntryResult) => void;
   // Callback when entry fails
   onEntryFailed?: (token: DiscoveredToken, error: string) => void;
 }
 
-export interface EntryResult {
+export interface WebSocketEntryResult {
   success: boolean;
   token: DiscoveredToken;
   signal?: EntrySignal;
@@ -320,7 +320,7 @@ export class WebSocketEntryOrchestrator {
       // Prepare the entry
       const entryResult = await prepareEntry(validatedSignal, entryOptions);
 
-      const result: EntryResult = {
+      const result: WebSocketEntryResult = {
         success: entryResult.success,
         token,
         signal: validatedSignal,
@@ -394,7 +394,7 @@ export class WebSocketEntryOrchestrator {
       liquidity: token.liquidity,
       volume24h: token.volumeH24,
       priceChange1h: token.priceChangeH1,
-      priceChange24h: token.priceChangeH24,
+      priceChangeH24: token.priceChangeH24,
       opportunityScore: token.opportunityScore,
       safetyScore: token.safety.confidence === 'high' ? 100 :
                    token.safety.confidence === 'medium' ? 70 : 40,
@@ -475,7 +475,7 @@ export const DEFAULT_ORCHESTRATOR_OPTIONS: Partial<WebSocketOrchestratorOptions>
   currentSolHolding: 0.1,
   minOpportunityScore: 60,
   minSafetyConfidence: 'medium',
-  enabledAges: ['fresh', 'warm'],
+  enabledAges: [TokenAge.FRESH, TokenAge.WARM],
 };
 
 /**
@@ -487,7 +487,7 @@ export const CONSERVATIVE_ORCHESTRATOR_OPTIONS: Partial<WebSocketOrchestratorOpt
   currentSolHolding: 0.1,
   minOpportunityScore: 75,
   minSafetyConfidence: 'high',
-  enabledAges: ['fresh'], // Only fresh tokens with high safety
+  enabledAges: [TokenAge.FRESH], // Only fresh tokens with high safety
 };
 
 /**
@@ -499,5 +499,5 @@ export const AGGRESSIVE_ORCHESTRATOR_OPTIONS: Partial<WebSocketOrchestratorOptio
   currentSolHolding: 0.1,
   minOpportunityScore: 50,
   minSafetyConfidence: 'medium',
-  enabledAges: ['fresh', 'warm'],
+  enabledAges: [TokenAge.FRESH, TokenAge.WARM],
 };

@@ -16,6 +16,7 @@ import { getTokenInfo, type DexScreenerTokenInfo } from './dexscreener';
 import { checkTokenSafetyAggregate } from '../safety/aggregator';
 import { getQuote } from '../jupiter/client';
 import type { AggregateSafetyResult } from '../safety/aggregator';
+import { DexScreenerBoostMessageSchema } from '../types';
 
 // ============================================================================
 // CONFIG
@@ -198,7 +199,7 @@ export class WebSocketDiscovery {
 
       this.ws.onmessage = async (event) => {
         try {
-          await this.handleMessage(event.data);
+          await this.handleMessage(event.data as unknown);
         } catch (error) {
           logger.error({ error }, 'Failed to handle WebSocket message');
         }
@@ -259,23 +260,73 @@ export class WebSocketDiscovery {
 
   /**
    * Handle incoming WebSocket message
+   *
+   * SECURITY: Validates message size, JSON structure, and data types
+   * to prevent DoS attacks and malformed data crashes.
    */
-  private async handleMessage(data: string | Buffer): Promise<void> {
-    let message: DexScreenerBoostMessage;
+  private async handleMessage(data: unknown): Promise<void> {
+    // SECURITY: Message size limit to prevent DoS
+    const MAX_MESSAGE_SIZE = 1_000_000; // 1MB
 
-    try {
-      message = JSON.parse(data.toString());
-    } catch {
-      return; // Ignore non-JSON messages
-    }
-
-    if (!message.data || !Array.isArray(message.data)) {
+    // Convert to string (handles Buffer, ArrayBuffer, and string)
+    let raw: string;
+    if (Buffer.isBuffer(data)) {
+      raw = data.toString();
+    } else if (typeof data === 'string') {
+      raw = data;
+    } else if (data instanceof ArrayBuffer) {
+      raw = Buffer.from(data).toString();
+    } else {
+      logger.debug('Unknown data type from WebSocket, ignoring');
       return;
     }
 
+    if (raw.length > MAX_MESSAGE_SIZE) {
+      logger.warn({ size: raw.length }, 'WebSocket message too large, ignoring');
+      return;
+    }
+
+    // SECURITY: Validate JSON structure
+    let parsedMessage: unknown;
+    try {
+      parsedMessage = JSON.parse(raw);
+    } catch {
+      logger.debug('Received non-JSON message, ignoring');
+      return; // Ignore non-JSON messages
+    }
+
+    // SECURITY: Validate message structure
+    if (!parsedMessage || typeof parsedMessage !== 'object') {
+      logger.debug('Invalid message structure (not an object), ignoring');
+      return;
+    }
+
+    // Type guard for DexScreenerBoostMessage
+    const msg = parsedMessage as Partial<DexScreenerBoostMessage>;
+    if (!msg.data || !Array.isArray(msg.data)) {
+      logger.debug('Invalid message structure (missing or invalid data array), ignoring');
+      return;
+    }
+
+    // SECURITY: Limit array size to prevent memory exhaustion
+    const MAX_DATA_ITEMS = 100;
+    if (msg.data.length > MAX_DATA_ITEMS) {
+      logger.warn({ itemCount: msg.data.length }, 'Message contains too many items, truncating');
+      msg.data = msg.data.slice(0, MAX_DATA_ITEMS);
+    }
+
+    // SECURITY: Validate with Zod schema
+    const validationResult = DexScreenerBoostMessageSchema.safeParse(msg);
+    if (!validationResult.success) {
+      logger.debug({ errors: validationResult.error.flatten() }, 'WebSocket message schema validation failed');
+      return;
+    }
+
+    const message = validationResult.data;
+
     // Filter for Solana tokens only
     const solanaBoosts = message.data.filter(
-      boost => boost.chainId === 'solana' && boost.tokenAddress
+      boost => boost.chainId === 'solana'
     );
 
     if (solanaBoosts.length === 0) {

@@ -7,6 +7,8 @@
  */
 
 import { logger } from '../utils/logger';
+import { RugCheckReportSchema } from '../types';
+import { z } from 'zod';
 
 // ============================================================================
 // CONFIG
@@ -99,7 +101,13 @@ export interface RugCheckReportRaw {
   creatorTokens: unknown[] | null;
   launchpad: string | null;
   deployPlatform: string;
+  [key: string]: unknown; // Allow additional properties
 }
+
+/**
+ * Validated RugCheck report (from Zod schema)
+ */
+export type ValidatedRugCheckReport = z.infer<typeof import('../types').RugCheckReportSchema>;
 
 // Simplified token security interface (matches GoPlus pattern)
 export interface RugCheckTokenSecurity {
@@ -147,7 +155,19 @@ export async function checkTokenSecurity(tokenAddress: string): Promise<RugCheck
       return null;
     }
 
-    const data = (await response.json()) as RugCheckReportRaw;
+    const rawData = await response.json();
+
+    // SECURITY: Validate API response structure before using
+    const validationResult = RugCheckReportSchema.safeParse(rawData);
+    if (!validationResult.success) {
+      logger.warn(
+        { tokenAddress, errors: validationResult.error.flatten() },
+        'RugCheck API response validation failed'
+      );
+      return null;
+    }
+
+    const data = validationResult.data;
 
     logger.debug(
       { score: data.score, normalizedScore: data.score_normalised, risks: data.risks?.length },
@@ -219,7 +239,7 @@ export async function getTokenSummary(tokenAddress: string): Promise<RugCheckRep
 /**
  * Convert raw RugCheck response to simplified format
  */
-function convertToTokenSecurity(raw: RugCheckReportRaw): RugCheckTokenSecurity {
+function convertToTokenSecurity(raw: z.infer<typeof RugCheckReportSchema>): RugCheckTokenSecurity {
   // Calculate locked liquidity from all lockers
   const lockedLiquidity = Object.values(raw.lockers ?? {}).reduce(
     (sum, locker) => sum + (locker.usdcLocked ?? 0),
@@ -260,7 +280,7 @@ function convertToTokenSecurity(raw: RugCheckReportRaw): RugCheckTokenSecurity {
 /**
  * Calculate confidence score based on RugCheck data
  */
-function calculateConfidence(token: RugCheckReportRaw): string {
+function calculateConfidence(token: z.infer<typeof RugCheckReportSchema>): string {
   let score = 100;
 
   // Determine authority risks from token data
