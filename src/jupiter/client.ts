@@ -23,9 +23,12 @@ import { getWalletKeypair, getConnection } from '../solana';
 // CONFIG
 // ============================================================================
 
-// Create Jupiter API client
+// Get API key from environment
+const JUPITER_API_KEY = process.env.JUPITER_API_KEY;
+
+// Create Jupiter API client with API key if available
 const jupiterApi = createJupiterApiClient({
-  // Default base URL is already set to https://quote-api.jup.ag/v6
+  apiKey: JUPITER_API_KEY,
 });
 
 // ============================================================================

@@ -1,0 +1,16 @@
+services:
+  picker:
+    build: .
+    container_name: picker
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: ["npx", "tsx", "src/index.ts", "start:paper"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

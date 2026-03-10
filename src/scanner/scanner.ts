@@ -68,15 +68,15 @@ export interface ScannerOptions {
 // ============================================================================
 
 export const DEFAULT_SCAN_CRITERIA: ScanCriteria = {
-  // Early Momentum + Volume Spike Strategy (Option 2 + 3)
-  minLiquidityUsd: 15000,
-  maxLiquidityUsd: 5000000, // Max $5M to avoid very established tokens
-  minVolume24h: 5000,
-  minPriceChange1h: 2, // Only 2% pump in 1h (EARLY - not 5%)
-  maxPairAgeHours: 6, // Maximum 6 hours old (catch early moves)
-  minPairAgeHours: 0.25, // At least 15 minutes old (avoid brand new rugs)
-  minVolumeRatio: 1.5, // h1 volume should be 1.5x higher than expected from h6
-  minBuyPressure: 1.3, // At least 30% more buys than sells
+  // Loosened filters for better token discovery (2026-03-10)
+  minLiquidityUsd: 10000,      // Lowered from 15000 - allow smaller pools
+  maxLiquidityUsd: 5000000,    // Max $5M to avoid very established tokens
+  minVolume24h: 1000,          // Lowered from 5000 - allow lower volume tokens
+  minPriceChange1h: 1,         // Lowered from 2% - catch smaller moves early
+  maxPairAgeHours: 6,          // Maximum 6 hours old (catch early moves)
+  minPairAgeHours: 0.25,       // At least 15 minutes old (avoid brand new rugs)
+  minVolumeRatio: 0.8,         // Lowered from 1.5 - catch volume spikes earlier
+  minBuyPressure: 0.9,         // Lowered from 1.3 - allow balanced buy/sell
 };
 
 // ============================================================================
