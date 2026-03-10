@@ -5,11 +5,11 @@
  * Reads from environment variables with sensible defaults.
  */
 
-// Read from environment with defaults (negate stop loss for loss)
-const STOP_LOSS = -(Number(process.env.STOP_LOSS_PERCENTAGE) || 15);
-const TRAILING_STOP = Number(process.env.TRAILING_STOP_PERCENTAGE) || 10;
-const TRAILING_ACTIVATION = Number(process.env.TRAILING_STOP_ACTIVATION_PERCENTAGE) || 5;
-const MAX_HOLD_HOURS = Number(process.env.MAX_HOLD_TIME_HOURS) || 4;
+// Read from environment with defaults
+const STOP_LOSS_PCT = Number(process.env.STOP_LOSS_PERCENTAGE) || 15;
+const TRAILING_STOP_PCT = Number(process.env.TRAILING_STOP_PERCENTAGE) || 10;
+const TRAILING_ACTIVATION_PCT = Number(process.env.TRAILING_STOP_ACTIVATION_PERCENTAGE) || 25;
+const MAX_HOLD_HRS = Number(process.env.MAX_HOLD_TIME_HOURS) || 4;
 
 /**
  * Exit strategy configuration
@@ -23,11 +23,10 @@ const MAX_HOLD_HOURS = Number(process.env.MAX_HOLD_TIME_HOURS) || 4;
  */
 export const EXIT_CONFIG = {
   // Exit condition thresholds (percentages)
-  STOP_LOSS_PERCENT: STOP_LOSS,
-  TAKE_PROFIT_1_PERCENT: 10,  // Lock in 10% gains
-  TAKE_PROFIT_2_PERCENT: 25,  // Lock in 25% gains, activate trailing
-  TRAILING_STOP_PERCENT: TRAILING_STOP,
-  TRAILING_ACTIVATION_PERCENT: TRAILING_ACTIVATION,
+  STOP_LOSS_PERCENT: -STOP_LOSS_PCT,  // Negative = loss
+  TAKE_PROFIT_1_PERCENT: 10,           // Lock in 10% gains
+  TAKE_PROFIT_2_PERCENT: TRAILING_ACTIVATION_PCT, // Activate trailing at this gain
+  TRAILING_STOP_PERCENT: TRAILING_STOP_PCT,
 
   // Position sizes for partial exits (percent of remaining position)
   TAKE_PROFIT_1_SELL_PERCENT: 25,
@@ -35,7 +34,7 @@ export const EXIT_CONFIG = {
   STOP_LOSS_SELL_PERCENT: 100,  // Full exit on stop loss (memecoins dump fast)
 
   // Time limits
-  MAX_HOLD_TIME_MS: MAX_HOLD_HOURS * 60 * 60 * 1000,
+  MAX_HOLD_TIME_MS: MAX_HOLD_HRS * 60 * 60 * 1000,
 
   // Price monitoring
   PRICE_POLL_INTERVAL_MS: 2000, // Poll every 2 seconds
@@ -84,7 +83,7 @@ export const STATE_TRANSITIONS: Record<
   stop_loss: {
     fromStates: ['ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING'],
     toState: 'FAILED',
-    sellPercentOfRemaining: 50,
+    sellPercentOfRemaining: 100,  // Full exit on stop loss
   },
   take_profit_1: {
     fromStates: ['ACTIVE'],
