@@ -25,14 +25,15 @@ Build a Solana crypto trading bot that:
 | 01-architecture.md | ✅ Complete | Overall system architecture, API stack, Docker setup |
 | 02-decimal-handling.md | ✅ Complete | CRITICAL: Solving 6-9 decimal token issue |
 | 03-paper-trading.md | ✅ Complete | Paper trading architecture with realistic simulation |
+| 05-compounding.md | ✅ Complete | 3-stage compounding: build, growth, expansion |
 
 ### 🔄 In Progress
 
 | Topic | Status | Next Discussion |
 |-------|--------|-----------------|
-| Position Compounding | 📝 Planned | How to compound 0.1 SOL after tripling |
 | Error Recovery | 📝 Planned | RPC failures, stuck transactions |
 | Monitoring/Dashboard | 📝 Planned | Grafana setup, real-time metrics |
+| Exit Strategy Details | 📝 Planned | WebSocket setup, trailing stop implementation |
 
 ---
 
@@ -76,6 +77,14 @@ await jupiter.swap({
 - Max drawdown < 30%
 - Real quotes, simulated execution
 
+### 5. Compounding Strategy
+- **Build Stage (0.1-0.3 SOL):** Fixed 0.1 SOL, compound +0.05 per 0.05 profit
+- **Growth Stage (0.3-1.0 SOL):** Scale 0.15→0.25 SOL, compound +0.1 per 0.1 profit
+- **Expansion Stage (1.0+ SOL):** 20% of portfolio, profit taking at 50% gain
+- **Drawdown Protection:** 30% drawdown = reduce base 20%, drop below 0.3 = reset to build
+
+**Full Design:** `design/05-compounding.md`
+
 ---
 
 ## Technical Stack
@@ -113,7 +122,9 @@ Picker/
 ├── design/                      # All design docs
 │   ├── 01-architecture.md       # Overall system design
 │   ├── 02-decimal-handling.md   # Token decimals solution
-│   └── 03-paper-trading.md      # Paper trading architecture
+│   ├── 03-paper-trading.md      # Paper trading architecture
+│   ├── 05-compounding.md        # Compounding strategy
+│   ├── 04-monitoring-exit.md    # Exit strategy (pending)
 ├── docs/                        # API docs (to be added)
 ├── src/                         # Source code (when ready to build)
 └── .env.example                 # Config template
@@ -127,11 +138,14 @@ Same schema for both paper and live trading:
 
 ```sql
 -- Core tables
-token_metadata     -- Cache decimals, symbols
-positions          -- Entry/exit data with raw amounts
-safety_checks      -- RugCheck, GoPlus results
-trades             -- Execution log
-performance_snapshot -- Track growth over time
+token_metadata         -- Cache decimals, symbols
+positions              -- Entry/exit data with raw amounts
+safety_checks          -- RugCheck, GoPlus results
+trades                 -- Execution log
+performance_snapshot   -- Track growth over time
+compounding_state      -- Single-row state tracking
+position_sizes         -- Position sizing history
+withdrawals            -- Profit withdrawal log
 ```
 
 **Critical:** `positions.tokensReceivedRaw` stores the raw BN amount from Jupiter for accurate exit.
@@ -151,9 +165,9 @@ From direct conversation:
 
 ## Next Steps (Current Session Priorities)
 
-1. **Design Position Compounding Logic** - How to handle after 0.1 → 0.3 SOL
-2. **Design Error Recovery** - RPC failures, tx confirmation issues
-3. **Design Monitoring/Dashboard** - Grafana or CLI metrics
+1. **Design Error Recovery** - RPC failures, stuck transactions, retry logic
+2. **Design Monitoring/Dashboard** - Grafana or CLI metrics
+3. **Finalize Exit Strategy** - WebSocket setup, trailing stop implementation
 4. **Create Implementation Plan** - Phase-by-phase build guide
 
 ---
@@ -164,8 +178,9 @@ From direct conversation:
 - Designed paper trading architecture with realistic slippage simulation
 - Defined performance analytics and readiness criteria for going live
 - Discussed Docker setup for safety isolation
+- **Completed compounding strategy** with 3 stages (build, growth, expansion)
 
-**Key Insight:** Paper trading must use REAL Jupiter quotes but SIMULATED execution with realistic slippage based on pool depth, volatility, and trade size.
+**Key Insight:** Compounding scales position size gradually with profits but scales down quickly on losses. Stage downgrades protect capital during drawdowns.
 
 ---
 
