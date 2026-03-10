@@ -79,10 +79,11 @@ export function getRemainingPercent(state: PositionState): number {
     case 'ACTIVE':
       return 100;
     case 'PARTIAL_EXIT_1':
-      return 75; // Sold 25%
+      return 50; // Sold 50% at TP1
     case 'PARTIAL_EXIT_2':
+      return 50;
     case 'TRAILING':
-      return 50; // Sold 25% + 25% = 50%
+      return 50; // Sold 50% at TP1, trailing active
     case 'ENTERING':
     case 'EXITING':
     case 'CLOSED':

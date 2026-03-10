@@ -6,9 +6,9 @@
  */
 
 // Read from environment with defaults
-const STOP_LOSS_PCT = Number(process.env.STOP_LOSS_PERCENTAGE) || 15;
-const TRAILING_STOP_PCT = Number(process.env.TRAILING_STOP_PERCENTAGE) || 10;
-const TRAILING_ACTIVATION_PCT = Number(process.env.TRAILING_STOP_ACTIVATION_PERCENTAGE) || 25;
+const STOP_LOSS_PCT = Number(process.env.STOP_LOSS_PERCENTAGE) || 10;
+const TRAILING_STOP_PCT = Number(process.env.TRAILING_STOP_PERCENTAGE) || 7;
+const TRAILING_ACTIVATION_PCT = Number(process.env.TRAILING_STOP_ACTIVATION_PERCENTAGE) || 10;
 const MAX_HOLD_HRS = Number(process.env.MAX_HOLD_TIME_HOURS) || 4;
 
 /**
@@ -29,8 +29,8 @@ export const EXIT_CONFIG = {
   TRAILING_STOP_PERCENT: TRAILING_STOP_PCT,
 
   // Position sizes for partial exits (percent of remaining position)
-  TAKE_PROFIT_1_SELL_PERCENT: 25,
-  TAKE_PROFIT_2_SELL_PERCENT: 25,
+  TAKE_PROFIT_1_SELL_PERCENT: 50,  // Sell 50% at TP1
+  TAKE_PROFIT_2_SELL_PERCENT: 0,   // Disabled - trailing activates at TP1
   STOP_LOSS_SELL_PERCENT: 100,  // Full exit on stop loss (memecoins dump fast)
 
   // Time limits
@@ -81,32 +81,32 @@ export const STATE_TRANSITIONS: Record<
   }
 > = {
   stop_loss: {
-    fromStates: ['ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING'],
+    fromStates: ['ACTIVE', 'PARTIAL_EXIT_1', 'TRAILING'],
     toState: 'FAILED',
     sellPercentOfRemaining: 100,  // Full exit on stop loss
   },
   take_profit_1: {
     fromStates: ['ACTIVE'],
-    toState: 'PARTIAL_EXIT_1',
-    sellPercentOfRemaining: 25,
+    toState: 'TRAILING',  // Activate trailing after TP1
+    sellPercentOfRemaining: 50,  // Sell 50%
   },
   take_profit_2: {
-    fromStates: ['PARTIAL_EXIT_1'],
+    fromStates: [],  // Disabled
     toState: 'PARTIAL_EXIT_2',
-    sellPercentOfRemaining: 25,
+    sellPercentOfRemaining: 0,
   },
   trailing_stop: {
-    fromStates: ['PARTIAL_EXIT_2', 'TRAILING'],
+    fromStates: ['TRAILING'],
     toState: 'CLOSED',
-    sellPercentOfRemaining: 100, // Sell remaining
+    sellPercentOfRemaining: 100, // Sell remaining 50%
   },
   max_hold: {
-    fromStates: ['ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING'],
+    fromStates: ['ACTIVE', 'PARTIAL_EXIT_1', 'TRAILING'],
     toState: 'CLOSED',
     sellPercentOfRemaining: 100,
   },
   emergency: {
-    fromStates: ['ACTIVE', 'PARTIAL_EXIT_1', 'PARTIAL_EXIT_2', 'TRAILING'],
+    fromStates: ['ACTIVE', 'PARTIAL_EXIT_1', 'TRAILING'],
     toState: 'CLOSED',
     sellPercentOfRemaining: 100,
   },
