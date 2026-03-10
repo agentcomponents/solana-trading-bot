@@ -109,6 +109,7 @@ export interface TokenSearchResult {
   priceChangeH1: number;
   txnsH24: { buys: number; sells: number };
   pairAge: number; // Hours since pair creation
+  opportunityScore?: number; // Calculated opportunity score (0-100)
 }
 
 // ============================================================================
@@ -405,6 +406,7 @@ function pairToSearchResult(pair: DexScreenerPair): TokenSearchResult {
       sells: pair.txns.h24?.sells || 0,
     },
     pairAge,
+    opportunityScore: calculateOpportunityScoreFromPair(pair),
   };
 }
 
@@ -415,6 +417,15 @@ function pairToSearchResult(pair: DexScreenerPair): TokenSearchResult {
 export function calculateOpportunityScore(
   result: TokenSearchResult
 ): number {
+  // Use the score if already calculated
+  if (result.opportunityScore !== undefined) {
+    return result.opportunityScore;
+  }
+
+  return calculateOpportunityScoreFromResult(result);
+}
+
+function calculateOpportunityScoreFromResult(result: TokenSearchResult): number {
   let score = 0;
 
   // Volume score (0-40 points)
@@ -434,6 +445,32 @@ export function calculateOpportunityScore(
   const totalTxns = result.txnsH24.buys + result.txnsH24.sells;
   if (totalTxns > 0) {
     const buyRatio = result.txnsH24.buys / totalTxns;
+    score += buyRatio * 10;
+  }
+
+  return Math.round(score);
+}
+
+function calculateOpportunityScoreFromPair(pair: DexScreenerPair): number {
+  let score = 0;
+
+  // Volume score (0-40 points)
+  const volumeScore = Math.min(pair.volume.h24 / 100000, 40);
+  score += volumeScore;
+
+  // Price momentum (0-30 points)
+  if (pair.priceChange.h1 > 0) {
+    score += Math.min(pair.priceChange.h1, 30);
+  }
+
+  // Liquidity score (0-20 points)
+  const liquidityScore = Math.min((pair.liquidity?.usd ?? 0) / 50000, 20);
+  score += liquidityScore;
+
+  // Buy pressure (0-10 points)
+  const totalTxns = (pair.txns.h24?.buys || 0) + (pair.txns.h24?.sells || 0);
+  if (totalTxns > 0) {
+    const buyRatio = (pair.txns.h24?.buys || 0) / totalTxns;
     score += buyRatio * 10;
   }
 

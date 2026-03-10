@@ -35,6 +35,9 @@ export interface ScanResult {
   address: string;
   name: string;
   symbol: string;
+  chainId: string;
+  dexId: string;
+  pairAddress: string;
   priceUsd: number;
   liquidity: number;
   volumeH24: number;
@@ -42,6 +45,7 @@ export interface ScanResult {
   priceChangeH24: number;
   pairAge: number;
   opportunityScore: number;
+  txnsH24: { buys: number; sells: number };
   safety: {
     safe: boolean | null;
     confidence: 'high' | 'medium' | 'low';
@@ -126,6 +130,9 @@ export async function scanTrendingTokens(
       address: candidate.address,
       name: candidate.name,
       symbol: candidate.symbol,
+      chainId: candidate.chainId,
+      dexId: candidate.dexId,
+      pairAddress: candidate.pairAddress,
       priceUsd: candidate.priceUsd,
       liquidity: candidate.liquidity,
       volumeH24: candidate.volumeH24,
@@ -133,6 +140,7 @@ export async function scanTrendingTokens(
       priceChangeH24: candidate.priceChangeH24,
       pairAge: candidate.pairAge,
       opportunityScore: score,
+      txnsH24: candidate.txnsH24,
       safety: {
         safe: true, // Already filtered
         confidence: 'high', // Placeholder, will be filled if we run full check
@@ -192,13 +200,17 @@ export async function scanBySymbol(
     address: candidate.address,
     name: candidate.name,
     symbol: candidate.symbol,
+    chainId: candidate.chainId,
+    dexId: candidate.dexId,
+    pairAddress: candidate.pairAddress,
     priceUsd: candidate.priceUsd,
     liquidity: candidate.liquidity,
     volumeH24: candidate.volumeH24,
     priceChangeH1: candidate.priceChangeH1,
     priceChangeH24: candidate.priceChangeH24,
     pairAge: candidate.pairAge,
-    opportunityScore: calculateOpportunityScoreForResult(candidate),
+    opportunityScore: candidate.opportunityScore ?? 50,
+    txnsH24: candidate.txnsH24,
     safety: {
       safe: true,
       confidence: 'high',
@@ -233,13 +245,17 @@ export async function quickScan(
     address: candidate.address,
     name: candidate.name,
     symbol: candidate.symbol,
+    chainId: candidate.chainId,
+    dexId: candidate.dexId,
+    pairAddress: candidate.pairAddress,
     priceUsd: candidate.priceUsd,
     liquidity: candidate.liquidity,
     volumeH24: candidate.volumeH24,
     priceChangeH1: candidate.priceChangeH1,
     priceChangeH24: candidate.priceChangeH24,
     pairAge: candidate.pairAge,
-    opportunityScore: calculateOpportunityScoreForResult(candidate),
+    opportunityScore: candidate.opportunityScore ?? 50,
+    txnsH24: candidate.txnsH24,
     safety: {
       safe: null, // Unknown
       confidence: 'low',
@@ -326,10 +342,6 @@ function matchesCriteria(
   }
 
   return true;
-}
-
-function calculateOpportunityScoreForResult(pair: TokenSearchResult): number {
-  return calculateOpportunityScore(pair);
 }
 
 /**
