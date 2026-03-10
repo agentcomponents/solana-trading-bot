@@ -160,6 +160,16 @@ async function checkExits(): Promise<void> {
       const entrySol = formatSol(pos.entrySolSpent);
       const exitTime = formatTime(pos.exitTimestamp);
       
+      // Get wallet balance
+      let walletBalance = '0.100000';
+      try {
+        const state = db.prepare('SELECT value FROM bot_state WHERE key = ?').get('paper_wallet') as any;
+        if (state?.value) {
+          const wallet = JSON.parse(state.value);
+          walletBalance = wallet.solBalance?.toFixed(6) || '0.100000';
+        }
+      } catch {}
+      
       // Calculate P&L
       const pnlPercent = pos.exitReason?.includes('Stop') ? '-10%' : 
                          pos.exitReason?.includes('Trailing') ? '+5%' : '+10%';
@@ -184,6 +194,7 @@ async function checkExits(): Promise<void> {
         `📊 Reason: \`${pos.exitReason || 'Unknown'}\`\n` +
         `📈 P&L: \`${pnlPercent}\`\n` +
         `⏰ Time: \`${exitTime}\`\n` +
+        `${EMOJI.WALLET} Wallet: \`${walletBalance} SOL\`\n` +
         `[DexScreener](https://dexscreener.com/solana/${pos.tokenMint})`
       );
       
