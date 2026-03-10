@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana Trading Bot Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #0a0a0f;
+      color: #e4e4e7;
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #18181b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #52525b;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="border-b border-[#27272a] bg-[#0a0a0f]/95 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-[1800px] mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+            <span class="text-xl font-bold">S</span>
+          </div>
+          <span class="text-xl font-semibold">Solana Bot</span>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex items-center gap-8">
+          <a href="#" class="text-white font-medium">Dashboard</a>
+          <a href="#" class="text-zinc-400 hover:text-white transition">Trade</a>
+          <a href="#" class="text-zinc-400 hover:text-white transition">Analytics</a>
+          <a href="#" class="text-zinc-400 hover:text-white transition">Settings</a>
+        </nav>
+
+        <!-- Wallet -->
+        <div class="flex items-center gap-4">
+          <div class="text-right">
+            <div class="text-sm text-zinc-400">Wallet</div>
+            <div class="font-mono text-sm" id="wallet-balance">--</div>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-[1800px] mx-auto px-6 py-8">
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-4 gap-6 mb-8" id="stats-container">
+      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-6">
+        <div class="text-sm text-zinc-400 mb-2">Wallet Balance</div>
+        <div class="text-2xl font-semibold mb-1" id="stat-balance">--</div>
+        <div class="text-sm" id="stat-change">--</div>
+      </div>
+      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-6">
+        <div class="text-sm text-zinc-400 mb-2">Total Trades</div>
+        <div class="text-2xl font-semibold" id="stat-trades">--</div>
+      </div>
+      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-6">
+        <div class="text-sm text-zinc-400 mb-2">Win Rate</div>
+        <div class="text-2xl font-semibold" id="stat-winrate">--</div>
+      </div>
+      <div class="bg-[#18181b] rounded-xl border border-[#27272a] p-6">
+        <div class="text-sm text-zinc-400 mb-2">Total P&L</div>
+        <div class="text-2xl font-semibold" id="stat-pnl">--</div>
+      </div>
+    </div>
+
+    <!-- Two Column Layout -->
+    <div class="grid grid-cols-2 gap-6">
+      <!-- Left: Filtered Tokens -->
+      <div class="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-hidden">
+        <div class="p-6 border-b border-[#27272a]">
+          <h2 class="text-xl font-semibold">Filtered Tokens</h2>
+          <p class="text-sm text-zinc-400 mt-1">Tokens matching your criteria</p>
+        </div>
+        <div class="divide-y divide-[#27272a] max-h-[600px] overflow-y-auto" id="tokens-container">
+          <div class="p-8 text-center text-zinc-500">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Right: Active & Closed Trades -->
+      <div class="space-y-6">
+        <!-- Active Trades -->
+        <div class="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-hidden">
+          <div class="p-6 border-b border-[#27272a]">
+            <h2 class="text-xl font-semibold">Active Trades</h2>
+            <p class="text-sm text-zinc-400 mt-1" id="active-count">Loading...</p>
+          </div>
+          <div class="divide-y divide-[#27272a] max-h-[280px] overflow-y-auto" id="active-positions-container">
+            <div class="p-8 text-center text-zinc-500">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Closed Trades -->
+        <div class="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-hidden">
+          <div class="p-6 border-b border-[#27272a]">
+            <h2 class="text-xl font-semibold">Closed Trades</h2>
+            <p class="text-sm text-zinc-400 mt-1" id="closed-count">Loading...</p>
+          </div>
+          <div class="divide-y divide-[#27272a] max-h-[280px] overflow-y-auto" id="closed-positions-container">
+            <div class="p-8 text-center text-zinc-500">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const API_BASE = '/api';
+    let refreshInterval;
+
+    async function fetchJSON(url) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return await response.json();
+    }
+
+    function formatNumber(num, decimals = 6) {
+      return Number(num).toFixed(decimals);
+    }
+
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = Math.floor((now - date) / 60000);
+      return `${diff}m ago`;
+    }
+
+    async function loadStats() {
+      try {
+        const stats = await fetchJSON(`${API_BASE}/stats`);
+        document.getElementById('wallet-balance').textContent = `${formatNumber(stats.walletBalance, 4)} SOL`;
+        document.getElementById('stat-balance').textContent = `${formatNumber(stats.walletBalance, 4)} SOL`;
+        document.getElementById('stat-trades').textContent = stats.totalTrades;
+        document.getElementById('stat-winrate').textContent = `${formatNumber(stats.winRate, 1)}%`;
+
+        const pnlEl = document.getElementById('stat-pnl');
+        const changeEl = document.getElementById('stat-change');
+        const pnlStr = `${stats.totalPnl >= 0 ? '+' : ''}${formatNumber(stats.totalPnl, 6)} SOL`;
+        pnlEl.textContent = pnlStr;
+        pnlEl.className = `text-2xl font-semibold ${stats.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}`;
+
+        changeEl.textContent = `${formatNumber(stats.totalPnlPercent, 2)}%`;
+        changeEl.className = `text-sm ${stats.totalPnlPercent >= 0 ? 'text-green-500' : 'text-red-500'}`;
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      }
+    }
+
+    async function loadPositions() {
+      try {
+        const positions = await fetchJSON(`${API_BASE}/positions`);
+        const activePositions = positions.filter(p => p.state !== 'CLOSED');
+        const closedPositions = positions.filter(p => p.state === 'CLOSED');
+
+        // Update counts
+        document.getElementById('active-count').textContent = `${activePositions.length} positions open`;
+        document.getElementById('closed-count').textContent = `${closedPositions.length} trades completed`;
+
+        // Render active positions
+        const activeContainer = document.getElementById('active-positions-container');
+        if (activePositions.length === 0) {
+          activeContainer.innerHTML = '<div class="p-8 text-center text-zinc-500">No active positions</div>';
+        } else {
+          activeContainer.innerHTML = activePositions.map(pos => `
+            <div class="p-4 hover:bg-[#27272a] transition">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center font-bold text-sm">
+                    ${pos.symbol[0]}
+                  </div>
+                  <div>
+                    <div class="font-semibold">${pos.symbol}</div>
+                    <div class="text-sm text-zinc-400">${formatTime(pos.entryTimestamp)}</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="font-mono text-sm">${formatNumber(pos.entrySol, 6)} SOL</div>
+                  <div class="text-sm font-medium ${pos.currentPnlPercent >= 0 ? 'text-green-500' : 'text-red-500'}">
+                    ${pos.currentPnlPercent >= 0 ? '+' : ''}${formatNumber(pos.currentPnlPercent, 2)}%
+                  </div>
+                </div>
+                <div class="text-sm text-zinc-400">${pos.state}</div>
+                <a href="${pos.dexscreenerUrl}" target="_blank" rel="noopener" class="text-zinc-400 hover:text-white transition">
+                  ↗
+                </a>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Render closed positions
+        const closedContainer = document.getElementById('closed-positions-container');
+        if (closedPositions.length === 0) {
+          closedContainer.innerHTML = '<div class="p-8 text-center text-zinc-500">No closed positions</div>';
+        } else {
+          closedContainer.innerHTML = closedPositions.slice(0, 10).map(pos => `
+            <div class="p-4 hover:bg-[#27272a] transition">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center font-bold text-sm">
+                    ${pos.symbol[0]}
+                  </div>
+                  <div>
+                    <div class="font-semibold">${pos.symbol}</div>
+                    <div class="text-sm text-zinc-400">${pos.heldMinutes}m</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="font-mono text-sm">${formatNumber(pos.entrySol, 6)} SOL</div>
+                  <div class="text-sm font-medium ${(pos.pnlPercent ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}">
+                    ${pos.pnlPercent !== null ? (pos.pnlPercent >= 0 ? '+' : '') + formatNumber(pos.pnlPercent, 2) + '%' : '-'}
+                  </div>
+                </div>
+                <div class="text-sm text-zinc-400">${pos.exitReason || 'MANUAL'}</div>
+                <a href="${pos.dexscreenerUrl}" target="_blank" rel="noopener" class="text-zinc-400 hover:text-white transition">
+                  ↗
+                </a>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Failed to load positions:', error);
+        document.getElementById('active-positions-container').innerHTML = '<div class="p-8 text-center text-red-500">Failed to load positions</div>';
+        document.getElementById('closed-positions-container').innerHTML = '<div class="p-8 text-center text-red-500">Failed to load positions</div>';
+      }
+    }
+
+    async function loadTokens() {
+      try {
+        const tokens = await fetchJSON(`${API_BASE}/tokens`);
+        const container = document.getElementById('tokens-container');
+
+        if (tokens.length === 0) {
+          container.innerHTML = '<div class="p-8 text-center text-zinc-500">No tokens found</div>';
+          return;
+        }
+
+        container.innerHTML = tokens.map(token => `
+          <div class="p-4 hover:bg-[#27272a] transition cursor-pointer">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold">
+                  ${token.symbol[0]}
+                </div>
+                <div>
+                  <div class="font-semibold">${token.symbol}</div>
+                  <div class="text-sm text-zinc-400">${token.name}</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="font-mono">$${formatNumber(token.priceUsd, 6)}</div>
+                <div class="text-sm ${token.priceChangeH1 >= 0 ? 'text-green-500' : 'text-red-500'}">
+                  ${token.priceChangeH1 >= 0 ? '+' : ''}${formatNumber(token.priceChangeH1, 1)}% (1h)
+                </div>
+              </div>
+              <div class="text-center">
+                <div class="text-sm text-zinc-400">Score</div>
+                <div class="font-semibold">${token.opportunityScore}/100</div>
+              </div>
+              <a href="${token.dexscreenerUrl}" target="_blank" rel="noopener noreferrer"
+                 class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition">
+                Trade
+              </a>
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error('Failed to load tokens:', error);
+        document.getElementById('tokens-container').innerHTML = '<div class="p-8 text-center text-red-500">Failed to load tokens</div>';
+      }
+    }
+
+    async function loadData() {
+      await Promise.all([loadStats(), loadPositions(), loadTokens()]);
+    }
+
+    // Initial load
+    loadData();
+
+    // Refresh every 5 seconds
+    refreshInterval = setInterval(loadData, 5000);
+  </script>
+</body>
+</html>
