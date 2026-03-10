@@ -140,6 +140,8 @@ export interface TokenSearchResult {
   priceUsd: number;
   liquidity: number;
   volumeH24: number;
+  volumeH6?: number;  // Volume in last 6 hours
+  volumeH1?: number;  // Volume in last 1 hour
   priceChangeH24: number;
   priceChangeH1: number;
   txnsH24: { buys: number; sells: number };
@@ -663,6 +665,8 @@ function pairToSearchResult(pair: DexScreenerPair): TokenSearchResult {
     priceUsd: parseFloat(pair.priceUsd) || 0,
     liquidity: pair.liquidity?.usd || 0,
     volumeH24: pair.volume.h24,
+    volumeH6: pair.volume.h6,
+    volumeH1: pair.volume.h1,
     priceChangeH24: pair.priceChange.h24,
     priceChangeH1: pair.priceChange.h1,
     txnsH24: {
@@ -692,51 +696,81 @@ export function calculateOpportunityScore(
 function calculateOpportunityScoreFromResult(result: TokenSearchResult): number {
   let score = 0;
 
-  // Volume score (0-40 points)
-  const volumeScore = Math.min(result.volumeH24 / 100000, 40); // Max 40 at $100K volume
-  score += volumeScore;
-
-  // Price momentum (0-30 points)
-  if (result.priceChangeH1 > 0) {
-    score += Math.min(result.priceChangeH1, 30); // Max 30 for +30% in 1h
+  // Volume spike detection (0-35 points)
+  if (result.volumeH6 && result.volumeH1) {
+    const expectedH1 = result.volumeH6 / 6;
+    const volumeRatio = result.volumeH1 / expectedH1;
+    score += Math.min(Math.max((volumeRatio - 1) * 15, 0), 35);
   }
 
-  // Liquidity score (0-20 points)
-  const liquidityScore = Math.min(result.liquidity / 50000, 20); // Max 20 at $50K liquidity
-  score += liquidityScore;
+  // Early momentum bonus (0-30 points) - reward 2-10% range
+  if (result.priceChangeH1 > 0) {
+    if (result.priceChangeH1 >= 2 && result.priceChangeH1 <= 10) {
+      score += 30;
+    } else if (result.priceChangeH1 < 2) {
+      score += result.priceChangeH1 * 10;
+    } else {
+      score += Math.max(30 - (result.priceChangeH1 - 10) * 2, 10);
+    }
+  }
 
-  // Buy pressure (0-10 points)
+  // Buy pressure (0-25 points)
   const totalTxns = result.txnsH24.buys + result.txnsH24.sells;
   if (totalTxns > 0) {
     const buyRatio = result.txnsH24.buys / totalTxns;
-    score += buyRatio * 10;
+    score += Math.max((buyRatio - 0.5) * 50, 0);
   }
 
-  return Math.round(score);
+  // Liquidity score (0-10 points)
+  const liq = result.liquidity;
+  if (liq >= 15000 && liq <= 100000) {
+    score += 10;
+  } else if (liq >= 10000 && liq < 15000) {
+    score += 5;
+  } else if (liq > 100000 && liq <= 500000) {
+    score += 5;
+  }
+
+  return Math.round(Math.min(score, 100));
 }
 
 function calculateOpportunityScoreFromPair(pair: DexScreenerPair): number {
   let score = 0;
 
-  // Volume score (0-40 points)
-  const volumeScore = Math.min(pair.volume.h24 / 100000, 40);
-  score += volumeScore;
-
-  // Price momentum (0-30 points)
-  if (pair.priceChange.h1 > 0) {
-    score += Math.min(pair.priceChange.h1, 30);
+  // Volume spike detection (0-35 points) - HIGHER WEIGHT for early movers
+  if (pair.volume.h6 > 0 && pair.volume.h1 > 0) {
+    const expectedH1 = pair.volume.h6 / 6;
+    const volumeRatio = pair.volume.h1 / expectedH1;
+    score += Math.min(Math.max((volumeRatio - 1) * 15, 0), 35);
   }
 
-  // Liquidity score (0-20 points)
-  const liquidityScore = Math.min((pair.liquidity?.usd ?? 0) / 50000, 20);
-  score += liquidityScore;
+  // Early momentum bonus (0-30 points) - reward 2-10% range
+  if (pair.priceChange.h1 > 0) {
+    if (pair.priceChange.h1 >= 2 && pair.priceChange.h1 <= 10) {
+      score += 30;
+    } else if (pair.priceChange.h1 < 2) {
+      score += pair.priceChange.h1 * 10;
+    } else {
+      score += Math.max(30 - (pair.priceChange.h1 - 10) * 2, 10);
+    }
+  }
 
-  // Buy pressure (0-10 points)
+  // Buy pressure (0-25 points) - HIGHER WEIGHT
   const totalTxns = (pair.txns.h24?.buys || 0) + (pair.txns.h24?.sells || 0);
   if (totalTxns > 0) {
     const buyRatio = (pair.txns.h24?.buys || 0) / totalTxns;
-    score += buyRatio * 10;
+    score += Math.max((buyRatio - 0.5) * 50, 0);
   }
 
-  return Math.round(score);
+  // Liquidity score (0-10 points)
+  const liq = (pair.liquidity?.usd ?? 0);
+  if (liq >= 15000 && liq <= 100000) {
+    score += 10;
+  } else if (liq >= 10000 && liq < 15000) {
+    score += 5;
+  } else if (liq > 100000 && liq <= 500000) {
+    score += 5;
+  }
+
+  return Math.round(Math.min(score, 100));
 }

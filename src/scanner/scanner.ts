@@ -29,6 +29,9 @@ export interface ScanCriteria {
   minPriceChange1h?: number;
   maxPairAgeHours?: number;
   minPairAgeHours?: number;
+  // Volume spike detection
+  minVolumeRatio?: number;  // h1/h6 volume ratio (e.g., 2x = h1 volume is 2x what you'd expect)
+  minBuyPressure?: number;   // buy/sell ratio (e.g., 1.5 = 1.5x more buys than sells)
 }
 
 export interface ScanResult {
@@ -65,12 +68,15 @@ export interface ScannerOptions {
 // ============================================================================
 
 export const DEFAULT_SCAN_CRITERIA: ScanCriteria = {
+  // Early Momentum + Volume Spike Strategy (Option 2 + 3)
   minLiquidityUsd: 15000,
   maxLiquidityUsd: 5000000, // Max $5M to avoid very established tokens
   minVolume24h: 5000,
-  minPriceChange1h: 5, // At least 5% pump in 1h
-  maxPairAgeHours: 24, // Maximum 24 hours old (fresh tokens)
-  minPairAgeHours: 0.5, // At least 30 minutes old (avoid brand new rugs)
+  minPriceChange1h: 2, // Only 2% pump in 1h (EARLY - not 5%)
+  maxPairAgeHours: 6, // Maximum 6 hours old (catch early moves)
+  minPairAgeHours: 0.25, // At least 15 minutes old (avoid brand new rugs)
+  minVolumeRatio: 1.5, // h1 volume should be 1.5x higher than expected from h6
+  minBuyPressure: 1.3, // At least 30% more buys than sells
 };
 
 // ============================================================================
@@ -328,17 +334,43 @@ function matchesCriteria(
     return false;
   }
 
-  // Price change check (pumping)
+  // Price change check (pumping) - EARLY at only 2%
   if (criteria.minPriceChange1h && pair.priceChangeH1 < criteria.minPriceChange1h) {
     return false;
   }
 
-  // Pair age check
+  // Pair age check (15 min to 6 hours)
   if (criteria.maxPairAgeHours && pair.pairAge > criteria.maxPairAgeHours) {
     return false;
   }
   if (criteria.minPairAgeHours && pair.pairAge < criteria.minPairAgeHours) {
     return false;
+  }
+
+  // Volume spike check: h1 volume should be elevated compared to h6
+  if (criteria.minVolumeRatio && pair.volumeH6) {
+    // If h6 has X volume, h1 should have > X/6 * ratio
+    // For example: if h6 = $60K (so $10K/hour avg), and ratio = 1.5
+    // Then h1 should be > $10K * 1.5 = $15K
+    const expectedH1Volume = pair.volumeH6 / 6;
+    const actualH1Volume = pair.volumeH1 || 0;
+    if (actualH1Volume < expectedH1Volume * criteria.minVolumeRatio) {
+      return false;
+    }
+  }
+
+  // Buy pressure check: more buys than sells
+  if (criteria.minBuyPressure && pair.txnsH24) {
+    const { buys, sells } = pair.txnsH24;
+    if (sells > 0) {
+      const buyRatio = buys / sells;
+      if (buyRatio < criteria.minBuyPressure) {
+        return false;
+      }
+    } else if (buys === 0) {
+      // No transactions at all
+      return false;
+    }
   }
 
   return true;
