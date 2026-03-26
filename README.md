@@ -1,32 +1,57 @@
-# Solana Trading Bot - Picker
+# Solana Trading Bot
 
-**Goal:** Build an automated Solana crypto trading bot that maximizes SOL holdings through intelligent token discovery and strategic entry/exit.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptScriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Tests](https://img.shields.io/badge/Tests-299%20passing-brightgreen)](https://vitest.dev/)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
----
+A production-ready automated trading bot for Solana DEXs with real-time token discovery, multi-layer safety validation, and Jupiter swap integration.
 
-## Project Overview
-
-This bot uses real-time WebSocket discovery to find trading opportunities on Solana:
-
-1. **Discovers** tokens in real-time via DexScreener WebSocket
-2. **Classifies** by age: FRESH (<1hr) vs WARM (1-4hr)
-3. **Validates** safety (RugCheck) and tradeability (Jupiter)
-4. **Enters** with age-appropriate strategy (10% FRESH / 5% WARM targets)
-5. **Exits** with profit via automated stop loss/target profit
-
-**User Philosophy:** "I don't want to hold bags. I only want to hold SOL!"
+![Dashboard](dashboard.png)
 
 ---
 
-## Current Status: ✅ FULLY IMPLEMENTED
+## Features
 
-| Phase | Status |
-|-------|--------|
-| 📝 Design | ✅ Complete |
-| 🔨 Implementation | ✅ Complete |
-| 📊 Paper Trading | ✅ Complete |
-| 🚀 WebSocket Discovery | ✅ Complete |
-| 🔧 Jupiter Filter | ⏳ Tuning |
+### Real-Time Token Discovery
+- DexScreener WebSocket integration for instant token detection
+- Age-based classification (FRESH vs WARM tokens)
+- Automatic filtering via Jupiter tradeability checks
+
+### Multi-Layer Safety Validation
+- **RugCheck.xyz** - Mint authority, freeze authority, liquidity analysis
+- **GoPlus Security** - Smart contract verification, honeypot detection
+- **Jupiter Pre-filter** - Only tradeable tokens considered
+
+### Jupiter DEX Integration
+- Real-time quote fetching with slippage estimation
+- Atomic swap execution via Jupiter Ultra API
+- Priority fee optimization for fast landing
+
+### Paper Trading Mode
+- Real Jupiter quotes, simulated execution
+- Performance tracking before live deployment
+- Realistic slippage and fee modeling
+
+### Position Management
+- SQLite-based position tracking
+- Automated stop-loss and take-profit
+- Configurable exit strategies
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Language | TypeScript 5.0+ |
+| Runtime | Node.js 20+ |
+| Blockchain | @solana/web3.js |
+| DEX Aggregation | Jupiter Ultra API |
+| Database | Better SQLite3 |
+| Real-time Data | DexScreener WebSocket |
+| RPC Provider | Helius |
+| Testing | Vitest |
 
 ---
 
@@ -36,102 +61,19 @@ This bot uses real-time WebSocket discovery to find trading opportunities on Sol
 # Install dependencies
 npm install
 
-# Copy environment template
+# Configure environment
 cp .env.example .env
 # Edit .env with your API keys
-
-# Build
-npm run build
 
 # Run tests
 npm test
 
-# Start bot (paper trading mode)
+# Start in paper trading mode
 npm run start:paper
 
-# Start bot (live trading mode)
+# Start in live mode (use with caution)
 npm run start:live
 ```
-
----
-
-## Key Features
-
-### Real-Time Discovery
-- DexScreener WebSocket integration for instant token detection
-- Age-based classification (FRESH vs WARM tokens)
-- Jupiter tradeability pre-filtering
-
-### Age-Based Strategies
-
-| Parameter | FRESH (<1hr) | WARM (1-4hr) |
-|-----------|---------------|--------------|
-| Target Profit | 10% | 5% |
-| Stop Loss | -20% | -25% |
-| Max Hold Time | 1 hour | 4 hours |
-| Position Size | 0.05 SOL | 0.10 SOL |
-
-**Philosophy:** Consistent 5-10% wins compound better than hoping for 100%+.
-
-### Safety Checks
-- **RugCheck.xyz:** Mint authority, freeze authority, liquidity checks
-- **GoPlus Security:** Additional verification layer
-- **Jupiter Filter:** Only tradeable tokens considered
-
-### Paper Trading
-- Real Jupiter quotes, simulated execution
-- Realistic slippage modeling
-- Performance tracking before live trading
-
----
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Language | TypeScript / Node.js 20+ |
-| Blockchain | @solana/web3.js |
-| DEX Aggregation | @jup-ag/api |
-| Database | Better SQLite3 |
-| Discovery | DexScreener WebSocket |
-| RPC | Helius |
-| Testing | Vitest |
-
----
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# Trading Mode
-TRADING_MODE=live
-
-# Wallet
-WALLET_PRIVATE_KEY=your_private_key_here
-
-# RPC
-HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
-HELIUS_WS_URL=wss://mainnet.helius-rpc.com/?api-key=YOUR_KEY
-
-# APIs (Optional - RugCheck is free)
-GOPLUS_API_KEY=your_key
-```
-
----
-
-## Documentation
-
-- **CLAUDE.md** - Developer instructions and design decisions
-- **design/** - Detailed architecture documents
-  - `01-architecture.md` - System architecture
-  - `02-decimal-handling.md` - Token decimal solution
-  - `03-paper-trading.md` - Paper trading design
-  - `04-monitoring-exit.md` - Exit strategy
-  - `05-compounding.md` - Compounding logic
-  - `06-priority-fees.md` - Priority fee strategies
-  - `07-error-recovery.md` - Error recovery
-  - `08-implementation-plan.md` - Implementation roadmap
 
 ---
 
@@ -139,29 +81,61 @@ GOPLUS_API_KEY=your_key
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    TOKEN DISCOVERY ENGINE                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                                     │
-│   DexScreener WebSocket → Age Classification → Jupiter Filter  │
-│                                                                     │
-│   ┌──────────────┐      ┌──────────────────┐                   │
-│   │ FRESH (<1hr) │      │ WARM (1-4hr)    │                   │
-│   │ 10% target   │      │ 5% target       │                   │
-│   │ -20% stop    │      │ -25% stop        │                   │
-│   │ 0.05 SOL     │      │ 0.10 SOL         │                   │
-│   └──────────────┘      └──────────────────┘                   │
-│                                                                     │
+│                    DISCOVERY LAYER                          │
+│   DexScreener WebSocket → Age Classification → Jupiter      │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      TRADING ENGINE                           │
-├─────────────────────────────────────────────────────────────┤
-│   • Jupiter API for quotes and swaps                           │
-│   • RugCheck + GoPlus for safety                              │
-│   • Automated stop loss and take profit                         │
-│   • Position monitoring and tracking                            │
+│                    SAFETY LAYER                             │
+│   RugCheck.xyz + GoPlus Security + Liquidity Analysis       │
 └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    TRADING LAYER                            │
+│   Jupiter Quotes → Slippage Estimation → Atomic Swaps       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    POSITION LAYER                           │
+│   SQLite Tracking → Stop Loss → Take Profit → Exit          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Configuration
+
+```bash
+# Required
+HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+WALLET_PRIVATE_KEY=your_base58_private_key
+
+# Optional (enhanced safety)
+GOPLUS_API_KEY=your_api_key
+
+# Trading mode: paper | live
+TRADING_MODE=paper
+```
+
+---
+
+## Project Structure
+
+```
+src/
+├── bot/           # Main orchestrator and configuration
+├── db/            # SQLite client and migrations
+├── entry/         # Entry validation and execution
+├── exit/          # Exit strategies and monitoring
+├── safety/        # RugCheck, GoPlus integrations
+├── scanner/       # DexScreener WebSocket discovery
+├── jupiter/       # Jupiter API client
+└── utils/         # Decimal handling, retry logic
+
+tests/             # 299 tests across all modules
 ```
 
 ---
@@ -169,16 +143,21 @@ GOPLUS_API_KEY=your_key
 ## Testing
 
 ```bash
-# WebSocket discovery tests
-npx tsx tests/manual/test-websocket-discovery.ts
-npx tsx tests/manual/test-websocket-orchestrator.ts
-npx tsx tests/manual/test-websocket-paper-trading.ts
+# Run all tests
+npm test
 
-# Original tests
-npx tsx tests/manual/test-paper-trading.ts
-npx tsx tests/manual/test-live-swap.ts
-npx tsx tests/manual/test-swap-back.ts
+# Run with coverage
+npm run test:coverage
+
+# Run specific test file
+npx vitest run tests/safety/rugcheck.test.ts
 ```
+
+---
+
+## Disclaimer
+
+This software is provided for educational purposes. Cryptocurrency trading involves significant risk. Use at your own risk. The authors are not responsible for any financial losses.
 
 ---
 
@@ -188,4 +167,4 @@ MIT
 
 ---
 
-*Last Updated: 2026-03-10*
+*Built with TypeScript + Solana + Jupiter*
